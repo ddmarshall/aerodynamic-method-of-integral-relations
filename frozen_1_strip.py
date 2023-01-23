@@ -130,8 +130,6 @@ def frozen_two_strip_cone(M_inf: float, Beta: float, gamma: float):
         u_0 = unkns[0]
         u_1 = unkns[1]
         v_1 = unkns[2]
-        #p_0 = unkns[3]
-        #p_1 = unkns[4]
         rho_0 = unkns[3]
         rho_1 = unkns[4]
         theta = unkns[5]
@@ -177,36 +175,6 @@ def frozen_two_strip_cone(M_inf: float, Beta: float, gamma: float):
         I1_C = 4*(Q_1[0] - Q_del[0])*np.tan(Lambda) - 4*G_1[0] + 5*G_del[0] - np.tan(Lambda)*(2*F_1[0] + F_del[0])
         I1_XM = 4*(Q_1[1] - Q_del[1])*np.tan(Lambda) - 4*G_1[1] + 5*G_del[1] - np.tan(Lambda)*(2*F_1[1] + F_del[1])
         I1_YM = 4*(Q_1[2] - Q_del[2])*np.tan(Lambda) - 4*G_1[2] + 5*G_del[2] - np.tan(Lambda)*(2*F_1[2] + F_del[2])
-
-        '''
-        # Integrate from 0 -> del
-        #I0_C = (rho_0*u_0*r_0 + 4*(rho_1*u_1*r_1) - 5*(rho_del*u_del*r_del))*np.tan(Lambda) + 6*(rho_del*v_del)*r_del
-        #I0_C = (rho_0*u_0*r_0 - 4*(rho_1*u_1*r_1) + 3*(rho_del*u_del*r_del))*np.tan(Lambda) - 4*(-2*(rho_1*v_1)*r_1 + (rho_del*v_del)*r_del)
-
-        #I0_XM = ((p_0 + rho_0*(u_0**2))*r_0 + 4*(p_1 + rho_1*(u_1**2))*r_1 - 5*(p_del + rho_del*(u_del**2))*r_del)*np.tan(Lambda) + \
-        #     6*(rho_del*u_del*v_del)*r_del - np.tan(Lambda)*(p_0 + 4*p_1 + p_del)
-        # I0_XM = ((p_0 + rho_0*(u_0**2))*r_0 - 4*(p_1 + rho_1*(u_1**2))*r_1 + 3*(p_del + rho_del*(u_del**2))*r_del)*np.tan(Lambda) - \
-            #  4*(-2*(rho_1*u_1*v_1)*r_1 + (rho_del*u_del*v_del)*r_del) - np.tan(Lambda)*(p_0 - p_del)
-
-        #I0_YM = (4*(rho_1*u_1*v_1)*r_1 - 5*(rho_del*u_del*v_del)*r_del)*np.tan(Lambda) + \
-        #     6*(p_del + rho_del*(v_del**2))*r_del - np.tan(Lambda)*cot_theta*(p_0 + 4*p_1 + p_del)             
-        #I0_YM = (-4*(rho_1*u_1*v_1)*r_1 + 3*(rho_del*u_del*v_del)*r_del)*np.tan(Lambda) - \
-             #4*(-2*(p_1 + rho_1*(v_1**2))*r_1 + (p_del + rho_del*(v_del**2))*r_del) - np.tan(Lambda)*cot_theta*(p_0 - p_del) 
-
-        # Integrate from 0 -> 1/2 del
-        #I1_C = (5*rho_0*u_0*r_0 - 16*(rho_1*u_1*r_1) - (rho_del*u_del*r_del))*np.tan(Lambda) + 21*(rho_1*v_1)*r_1
-        #I1_C = (4*(rho_1*u_1*r_1) - 4*(rho_del*u_del*r_del))*np.tan(Lambda) - 4*(rho_1*v_1)*r_1 + 5*(rho_del*v_del)*r_del
-
-        #I1_XM = (5*(p_0 + rho_0*(u_0**2))*r_0 - 16*(p_1 + rho_1*(u_1**2))*r_1 - (p_del + rho_del*(u_del**2))*r_del)*np.tan(Lambda) + \
-        #     21*(rho_1*u_1*v_1)*r_1 - np.tan(Lambda)*(5*p_0 + 8*p_1 - p_del)
-        #I1_XM = (4*(p_1 + rho_1*(u_1**2))*r_1 - 4*(p_del + rho_del*(u_del**2))*r_del)*np.tan(Lambda) - \
-        #     4*(rho_1*u_1*v_1)*r_1 + 5*(rho_del*u_del*v_del)*r_del - np.tan(Lambda)*(2*p_1 + p_del)
-
-        #I1_YM = (-16*(rho_1*u_1*v_1)*r_1 - (rho_del*u_del*v_del)*r_del)*np.tan(Lambda) + \
-        #     21*(p_1 + rho_1*(v_1**2))*r_1 - np.tan(Lambda)*cot_theta*(5*p_0 + 8*p_1 - p_del)
-        #I1_YM = (4*(rho_1*u_1*v_1)*r_1 - 4*(rho_del*u_del*v_del)*r_del)*np.tan(Lambda) - \
-             #4*(p_1 + rho_1*(v_1**2))*r_1 + 5*(p_del + rho_del*(v_del**2))*r_del - np.tan(Lambda)*cot_theta*(2*p_1 + p_del)
-        '''
 
         eqns_to_solve = np.array([I0_C, I0_XM, I0_YM, I1_C, I1_XM, I1_YM])
 
