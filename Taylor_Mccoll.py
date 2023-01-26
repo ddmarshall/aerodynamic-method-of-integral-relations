@@ -28,13 +28,10 @@ def Taylor_Macoll_ODEs_Modified(theta: float, V: list):
     Theta: From wave to surface [rad]
 
     '''
-    # V_max/V_1
-    v_m2V_1 = (((gamma-1)/2)*(Mach**2)*((1 + ((gamma-1)/2)*Mach**2)**-1))**(-0.5)
-
     # Derivatives from ODEs
     dv_r = V[1]
 
-    dv_theta = (V[0]*(V[1]**2) - ((gamma-1)/2)*(v_m2V_1**2 - V[0]**2 - V[1]**2)*(2*V[0] + V[1]*(1/np.tan(theta))))/(((gamma-1)/2)*(v_m2V_1**2 - V[0]**2 - V[1]**2) - (V[1]**2))
+    dv_theta = (V[0]*(V[1]**2) - ((gamma-1)/2)*(V_m2V_1**2 - V[0]**2 - V[1]**2)*(2*V[0] + V[1]*(1/np.tan(theta))))/(((gamma-1)/2)*(V_m2V_1**2 - V[0]**2 - V[1]**2) - (V[1]**2))
 
     return [dv_r, dv_theta]
 
@@ -68,11 +65,8 @@ def frozen_IC(M_inf: float, Beta: float):
     # Non demensioned total velocity: v = V/V_max
     v_NonDem_Vm = ((2/((gamma-1)*(M_2**2))) + 1)**(-1/2)
 
-    # V_max/V_1
-    v_m2V_1 = (((gamma-1)/2)*(M_inf**2)*((1 + ((gamma-1)/2)*M_inf**2)**-1))**(-0.5)
-
     # Non demensioned total velocity: v = V/V_1
-    v_NonDem_V1 = v_NonDem_Vm*v_m2V_1
+    v_NonDem_V1 = v_NonDem_Vm*V_m2V_1
 
     # Radial velocity
     v_r_0 = v_NonDem_V1*np.cos(Beta - Delta)
@@ -100,10 +94,11 @@ def Taylor_Macoll_Solve(ODEs, Initial_Condition, theta_range):
     # Interpolated function
     theta_cone = sci.optimize.root_scalar(interp_v_theta, bracket=[theta_range[0], theta_range[1]], method='bisect')
     
-    # Cone surface properties
+    # Cone surface properties non dem by V_1
     v_r_cone = solution.sol(theta_cone.root)[0]
     v_theta_cone = solution.sol(theta_cone.root)[1]
-    M_2_cone = np.sqrt((2/(gamma-1))*((v_r_cone**2)/(1-(v_r_cone**2))))
+
+    M_2_cone = np.sqrt((2/(gamma-1))*(((v_r_cone/V_m2V_1)**2)/(1-((v_r_cone/V_m2V_1)**2))))
 
     theta_cone_deg = np.rad2deg(theta_cone.root)
 
@@ -118,36 +113,42 @@ def Taylor_Macoll_Post(solution_function, theta):
     M_inf = Mach
     M_shock = M_2
 
+    # Get wave angle and specified angle
     theta = np.deg2rad(theta)
     Beta = solution_function.t_max
-    
-    v_r_shock = solution_function(Beta)[0]
-    # Cone surface properties as a fundtion of theta
-    v_r_theta = solution_function(theta)[0]
-    M_theta = np.sqrt((2/(gamma-1))*((v_r_theta**2)/(1-(v_r_theta**2))))
 
-    # Density behind shock
+    # Flow properties as functions of theta
+    v_r_theta = solution_function(theta)[0]
+    v_theta_theta = solution_function(theta)[1]
+
+    # Mach at specified theta (V_max based)
+    M_theta_Vm = np.sqrt((2/(gamma-1))*(((v_r_theta/V_m2V_1)**2 + (v_theta_theta/V_m2V_1)**2)/(1-((v_r_theta/V_m2V_1)**2) - ((v_theta_theta/V_m2V_1)**2))))
+
+    # Density behind shock (V_1 based)
     m = (M_inf**2)*(np.sin(Beta))**2
     rho_del = (6*m)/(5 + m)
 
-    # Density from isentropic relations
-    rho_2_rho_1 = ((1 + ((gamma-1)/2)*(M_theta**2))/(1 + ((gamma-1)/2)*(M_inf**2)))**(-1/(1-gamma))
-    
-    #(v_r_theta/v_r_shock)**(gamma-1)
+    # Density from isentropic relations (behind shock -> cone surface, V_max based)
+    rho_2_rho_1 = ((1 + ((gamma-1)/2)*(M_shock**2))/(1 + ((gamma-1)/2)*(M_theta_Vm**2)))**(-1/(1-gamma))
     rho_theta = rho_del*rho_2_rho_1
 
-    return
+    return [v_r_theta, v_theta_theta, rho_theta]
 
 
 def main():
 
     global Mach
     global gamma
+    global V_m2V_1
 
     Mach = 8
     gamma = 1.4
+    # Ratio to convert V_1 based to V_m based non-dimensional properties.(V_max/V_1:Nasa 1135 eqn.51)
+    V_m2V_1 = (((gamma-1)/2)*(Mach**2)*((1 + ((gamma-1)/2)*Mach**2)**-1))**(-0.5)
+
+    # Cone angle and stop angle for solver
     Beta = 38.155
-    stop_theta = 30
+    stop_theta = Beta/2
     
     theta_range = [Beta, stop_theta]
     Initial_Condition = frozen_IC(Mach, Beta)
