@@ -113,7 +113,7 @@ def Taylor_Macoll_Post(solution_function, theta):
     M_inf = Mach
     M_shock = M_2
 
-    # Get wave angle and specified angle
+    # Get wave angle and specified angle [rad]
     theta = np.deg2rad(theta)
     Beta = solution_function.t_max
 
@@ -133,6 +133,18 @@ def Taylor_Macoll_Post(solution_function, theta):
     rho_theta = rho_del*rho_2_rho_1
 
     return [v_r_theta, v_theta_theta, rho_theta]
+
+
+def coord_trans(V_r, V_theta, angle):
+    '''
+    angle [rad]
+    '''
+    angle = np.deg2rad(angle)
+
+    V_x = V_r*np.cos(angle) - V_theta*np.sin(angle)
+    V_y = V_r*np.sin(angle) + V_theta*np.cos(angle)
+
+    return [V_x, V_y]
 
 
 def main():
@@ -156,11 +168,25 @@ def main():
     # Get Full Solution with theta range
     [sol_func, theta_cone] = Taylor_Macoll_Solve(Taylor_Macoll_ODEs_Modified, Initial_Condition, theta_range)
 
-    # Get flow properties at specified theta line
-    Taylor_Macoll_Post(sol_func, theta_cone)
-    
-    print(theta_cone)
+    # Define intermediate strip angle [deg]
+    theta_1 = (Beta+theta_cone)/2
 
+    # Get flow properties at half theta line for 2-strip
+    [v_r_1, v_theta_1, rho_1] = Taylor_Macoll_Post(sol_func, Beta)
+
+    # Transfer from polar coord to cone x-y coord
+
+    [u_1, v_1] = coord_trans(v_r_1, v_theta_1, Beta - theta_cone)
+
+    
+    # Print Information
+    print('\nTaylor Macoll Solution: ' + str(theta_cone) + ' [deg]\n')
+    print(f'Flow Properties at theta: {theta_1} in Polar Coord')
+    print(f'v_r_1    : {v_r_1} \nv_theta_1: {v_theta_1} \nrho_1    : {rho_1}\n')
+
+    print(f'Flow Properties at theta: {theta_1} in x-y Coord')
+    print(f'u_1    : {u_1} \nv_theta_1: {v_1} \n')
+    
     '''
     # Plots
     # plt.plot(theta, v_theta)
@@ -176,5 +202,3 @@ def main():
 
 
 main()
-
-
