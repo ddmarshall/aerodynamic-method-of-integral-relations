@@ -172,20 +172,24 @@ def main():
     theta_1 = (Beta+theta_cone)/2
 
     # Get flow properties at half theta line for 2-strip
-    [v_r_1, v_theta_1, rho_1] = Taylor_Macoll_Post(sol_func, Beta)
+    [v_r_1, v_theta_1, rho_1] = Taylor_Macoll_Post(sol_func, theta_1)
 
     # Transfer from polar coord to cone x-y coord
+    [u_1, v_1] = coord_trans(v_r_1, v_theta_1, theta_1 - theta_cone)
 
-    [u_1, v_1] = coord_trans(v_r_1, v_theta_1, Beta - theta_cone)
+    # Get flow properties at cone theta for 2-strip
+    [u_0, v_0, rho_0] = Taylor_Macoll_Post(sol_func, theta_cone)
 
-    
     # Print Information
     print('\nTaylor Macoll Solution: ' + str(theta_cone) + ' [deg]\n')
     print(f'Flow Properties at theta: {theta_1} in Polar Coord')
-    print(f'v_r_1    : {v_r_1} \nv_theta_1: {v_theta_1} \nrho_1    : {rho_1}\n')
+    print(f'v_r_1: {v_r_1} \nv_theta_1: {v_theta_1} \nrho_1: {rho_1}\n')
 
     print(f'Flow Properties at theta: {theta_1} in x-y Coord')
-    print(f'u_1    : {u_1} \nv_theta_1: {v_1} \n')
+    print(f'u_1: {u_1} \nv_1: {v_1} \nrho_1: {rho_1}\n')
+
+    print(f'Flow Properties at cone: {theta_cone} in x-y Coord')
+    print(f'u_0  : {u_0} \nv_0  : {v_0} \nrho_0: {rho_0}\n')
     
     '''
     # Plots

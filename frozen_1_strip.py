@@ -147,44 +147,43 @@ def two_strip_relations(unkns):
     p_1 = (rho_1/(gamma*(M_inf**2)))*(1 + (1 - (u_1**2) - (v_1**2))*((gamma-1)/2)*(M_inf**2))
 
     # Integral Relation Unknows
-    Q_0 = [rho_0*u_0*r_0, (p_0 + rho_0*(u_0**2))*r_0 , 0]
-    Q_1 = [rho_1*u_1*r_1, (p_1 + rho_1*(u_1**2))*r_1, (rho_1*u_1*v_1)*r_1]
-    Q_del = [rho_del*u_del*r_del, (p_del + rho_del*(u_del**2))*r_del, (rho_del*u_del*v_del)*r_del]
-
-    G_0 = [0, 0, 0]
+    # Q Terms
+    Q_0 = [(rho_0*u_0)*r_0, (p_0 + rho_0*(u_0**2))*r_0 , 0]
+    Q_1 = [(rho_1*u_1)*r_1, (p_1 + rho_1*(u_1**2))*r_1, (rho_1*u_1*v_1)*r_1]
+    Q_del = [(rho_del*u_del)*r_del, (p_del + rho_del*(u_del**2))*r_del, (rho_del*u_del*v_del)*r_del]
+    # G Terms
+    G_0 = [0, 0, p_0*r_0]
     G_1 = [(rho_1*v_1)*r_1, (rho_1*u_1*v_1)*r_1, (p_1 + rho_1*(v_1**2))*r_1]
     G_del = [(rho_del*v_del)*r_del, (rho_del*u_del*v_del)*r_del, (p_del + rho_del*(v_del**2))*r_del]
-
+    # F Terms
     F_0 = [0, p_0, p_0*cot_theta]
     F_1 = [0, p_1, p_1*cot_theta]
     F_del = [0, p_del, p_del*cot_theta]
 
     # Integrate from 0 -> del
-    I0_C = (Q_0[0] - 4*Q_1[0] + 3*Q_del[0])*np.tan(Lambda) - 4*(-2*G_1[0] + G_del[0]) - np.tan(Lambda)*(F_0[0] - F_del[0])
-    I0_XM = (Q_0[1] - 4*Q_1[1] + 3*Q_del[1])*np.tan(Lambda) - 4*(-2*G_1[1] + G_del[1]) - np.tan(Lambda)*(F_0[1] - F_del[1])
-    I0_YM = (Q_0[2] - 4*Q_1[2] + 3*Q_del[2])*np.tan(Lambda) - 4*(-2*G_1[2] + G_del[2]) - np.tan(Lambda)*(F_0[2] - F_del[2])
+    I0_C = (Q_0[0] - 4*Q_1[0] + 3*Q_del[0])*np.tan(Lambda) - 4*(G_0[0] - 2*G_1[0] + G_del[0]) - np.tan(Lambda)*(F_0[0] - F_del[0])
+    I0_XM = (Q_0[1] - 4*Q_1[1] + 3*Q_del[1])*np.tan(Lambda) - 4*(G_0[1] - 2*G_1[1] + G_del[1]) - np.tan(Lambda)*(F_0[1] - F_del[1])
+    I0_YM = (Q_0[2] - 4*Q_1[2] + 3*Q_del[2])*np.tan(Lambda) - 4*(G_0[2] - 2*G_1[2] + G_del[2]) - np.tan(Lambda)*(F_0[2] - F_del[2])
 
     # Integrate from 0 -> 1/2 del
-    I1_C = 4*(Q_1[0] - Q_del[0])*np.tan(Lambda) - 4*G_1[0] + 5*G_del[0] - np.tan(Lambda)*(2*F_1[0] + F_del[0])
-    I1_XM = 4*(Q_1[1] - Q_del[1])*np.tan(Lambda) - 4*G_1[1] + 5*G_del[1] - np.tan(Lambda)*(2*F_1[1] + F_del[1])
-    I1_YM = 4*(Q_1[2] - Q_del[2])*np.tan(Lambda) - 4*G_1[2] + 5*G_del[2] - np.tan(Lambda)*(2*F_1[2] + F_del[2])
+    I1_C = 4*(Q_1[0] - Q_del[0])*np.tan(Lambda) - G_0[0] - 4*G_1[0] + 5*G_del[0] - np.tan(Lambda)*(2*F_1[0] + F_del[0])
+    I1_XM = 4*(Q_1[1] - Q_del[1])*np.tan(Lambda) - G_0[1] - 4*G_1[1] + 5*G_del[1] - np.tan(Lambda)*(2*F_1[1] + F_del[1])
+    I1_YM = 4*(Q_1[2] - Q_del[2])*np.tan(Lambda) - G_0[2] - 4*G_1[2] + 5*G_del[2] - np.tan(Lambda)*(2*F_1[2] + F_del[2])
 
     eqns_to_solve = np.array([I0_C, I0_XM, I0_YM, I1_C, I1_XM, I1_YM])
+
+    print(unkns, eqns_to_solve)
 
     return eqns_to_solve
 
 
-def frozen_two_strip_cone_solve():
-    
-    # Inital Guess:       [u_0,  u_1,    v_1,   rho_0,    rho_1,   theta]
-    sol_guess =  np.array([0.793814221281703, 0.7937777935322897, -0.060311038908503534, 5.193268801930688, 4.98051442246971, 0.5847021888888834])
+def frozen_two_strip_cone_solve(initial_guess):
 
-    solutions = sci.optimize.fsolve(two_strip_relations, sol_guess, full_output=True, xtol=1.49012e-10, maxfev=500)
+    solutions = sci.optimize.fsolve(two_strip_relations, initial_guess, full_output=True)
 
     print('theta N=2: ' + str(np.rad2deg(solutions[0][-1])))
     
-    print(solutions[0])
-    return
+    return solutions[0]
 
 
 def Two_Strip_Eqn_Test(input):
@@ -250,29 +249,40 @@ def Two_Strip_Eqn_Test(input):
     return
 
 
-#  1-Strip - Testing
-print(' ')
+def main():
+    #  1-Strip - Testing
+    print(' ')
 
-global M_inf
-global Beta
-global gamma
+    global M_inf
+    global Beta
+    global gamma
 
-M_inf = 8
-Beta = 38.155
-Beta = np.deg2rad(Beta)
-gamma = 1.4
+    M_inf = 8
+    Beta = 38.155
+    Beta = np.deg2rad(Beta)
+    gamma = 1.4
 
-[Theta, u_del, v_del, p_del, T_del, rho_del, u_0, p_0, T_0, rho_0] = frozen_one_strip_cone(M_inf, Beta, gamma)
+    # 1-Strip Solving
+    [Theta, u_del, v_del, p_del, T_del, rho_del, u_0, p_0, T_0, rho_0] = frozen_one_strip_cone(M_inf, Beta, gamma)
 
-print('1-Strip Conical Frozen Flow\n')
-print([np.rad2deg(Theta), u_del, v_del, p_del, T_del, rho_del, u_0, p_0, T_0, rho_0])
+    print('1-Strip Conical Frozen Flow\n')
+    print([np.rad2deg(Theta), u_del, v_del, p_del, T_del, rho_del, u_0, p_0, T_0, rho_0])
+    print('\n')
 
+    # 2-Strip Solving
+    # Inital Guess
+    u_0 = 0.7915200156896637 #0.7913637553006431 
+    u_1 = 0.7919718861644587
+    v_1 = -0.030536066611886743
+    rho_0 = 5.192282199293422
+    rho_1 = 5.138006805966865
+    theta = 0.5847021888888834
 
-#input_var = [u_0, u_del, v_del, p_0, p_del, rho_0, rho_del, Theta, Wave_angle]
-#Two_Strip_Eqn_Test(input_var)
+    initial_guess =  np.array([u_0, u_1, v_1, rho_0, rho_1, theta])
 
-frozen_two_strip_cone_solve()
+    solution = frozen_two_strip_cone_solve(initial_guess)
+    print(solution)
 
-#
-#print('Condition:\nM_inf: ' + str(Mach) + '\n' + 'Wave Angle: ' + str(Wave_angle) + ' [deg]\n' + 'Gamma: ' + str(gamma))
-#print('\nSolved:\nHalf Cone Angle: ' + str(theta) + ' [deg]')
+    return
+
+main()
