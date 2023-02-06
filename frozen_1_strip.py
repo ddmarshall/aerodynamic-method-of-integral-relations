@@ -98,8 +98,6 @@ def frozen_one_strip_cone(M_inf: float, Beta: float, gamma: float):
     
     v_max = (u_del**2 + v_del**2)**0.5
 
-    theta_deg = np.rad2deg(theta)
-
     return theta, u_del, v_del, p_del, T_del, rho_del, u_0, p_0, T_0, rho_0
 
 
@@ -126,7 +124,7 @@ def two_strip_relations(unkns):
     r_del = 1 + np.tan(Lambda)*cot_theta
 
     # Frozen Shock Relations
-    m = (M_inf**2)*(np.sin(Beta))**2
+    m = (M_inf**2)*(np.sin(Beta)**2)
     a = 5*(m-1)/(6*M_inf**2)
 
     # Density at strip_delta
@@ -139,8 +137,8 @@ def two_strip_relations(unkns):
     T_del = gamma*(M_inf**2)*p_del/rho_del
 
     #  u_del, v_del from frozen shock relations
-    u_del = (1-a)*np.cos(theta) + a*np.sin(theta)*cot_beta
-    v_del = -(1-a)*np.sin(theta) + a*np.cos(theta)*cot_beta
+    u_del = (1-a)*np.cos(theta) + a*cot_beta*np.sin(theta)
+    v_del = -(1-a)*np.sin(theta) + a*cot_beta*np.cos(theta)
 
     # Energy and state equations
     p_0 = (rho_0/(gamma*(M_inf**2)))*(1 + (1 - u_0**2)*((gamma-1)/2)*(M_inf**2))
@@ -160,15 +158,32 @@ def two_strip_relations(unkns):
     F_1 = [0, p_1, p_1*cot_theta]
     F_del = [0, p_del, p_del*cot_theta]
 
-    # Integrate from 0 -> del
-    I0_C = (Q_0[0] - 4*Q_1[0] + 3*Q_del[0])*np.tan(Lambda) - 4*(G_0[0] - 2*G_1[0] + G_del[0]) - np.tan(Lambda)*(F_0[0] - F_del[0])
-    I0_XM = (Q_0[1] - 4*Q_1[1] + 3*Q_del[1])*np.tan(Lambda) - 4*(G_0[1] - 2*G_1[1] + G_del[1]) - np.tan(Lambda)*(F_0[1] - F_del[1])
-    I0_YM = (Q_0[2] - 4*Q_1[2] + 3*Q_del[2])*np.tan(Lambda) - 4*(G_0[2] - 2*G_1[2] + G_del[2]) - np.tan(Lambda)*(F_0[2] - F_del[2])
+    # Jerry.S Coefficients
+    # # Integrate from 0 -> del
+    # I0_C = (Q_0[0] - 4*Q_1[0] + 3*Q_del[0])*np.tan(Lambda) - 4*(G_0[0] - 2*G_1[0] + G_del[0]) - np.tan(Lambda)*(F_0[0] - F_del[0])
+    # I0_XM = (Q_0[1] - 4*Q_1[1] + 3*Q_del[1])*np.tan(Lambda) - 4*(G_0[1] - 2*G_1[1] + G_del[1]) - np.tan(Lambda)*(F_0[1] - F_del[1])
+    # I0_YM = (Q_0[2] - 4*Q_1[2] + 3*Q_del[2])*np.tan(Lambda) - 4*(G_0[2] - 2*G_1[2] + G_del[2]) - np.tan(Lambda)*(F_0[2] - F_del[2])
 
-    # Integrate from 0 -> 1/2 del
-    I1_C = 4*(Q_1[0] - Q_del[0])*np.tan(Lambda) - G_0[0] - 4*G_1[0] + 5*G_del[0] - np.tan(Lambda)*(2*F_1[0] + F_del[0])
-    I1_XM = 4*(Q_1[1] - Q_del[1])*np.tan(Lambda) - G_0[1] - 4*G_1[1] + 5*G_del[1] - np.tan(Lambda)*(2*F_1[1] + F_del[1])
-    I1_YM = 4*(Q_1[2] - Q_del[2])*np.tan(Lambda) - G_0[2] - 4*G_1[2] + 5*G_del[2] - np.tan(Lambda)*(2*F_1[2] + F_del[2])
+    # # Integrate from 0 -> 1/2 del
+    # I1_C = 4*(Q_1[0] - Q_del[0])*np.tan(Lambda) - G_0[0] - 4*G_1[0] + 5*G_del[0] - np.tan(Lambda)*(2*F_1[0] + F_del[0])
+    # I1_XM = 4*(Q_1[1] - Q_del[1])*np.tan(Lambda) - G_0[1] - 4*G_1[1] + 5*G_del[1] - np.tan(Lambda)*(2*F_1[1] + F_del[1])
+    # I1_YM = 4*(Q_1[2] - Q_del[2])*np.tan(Lambda) - G_0[2] - 4*G_1[2] + 5*G_del[2] - np.tan(Lambda)*(2*F_1[2] + F_del[2])
+
+    # Dr.D Coefficients
+    # # Integrate from 0 -> del
+    I0_C = (Q_0[0] + 4*Q_1[0] - 5*Q_del[0])*np.tan(Lambda) + 6*(G_del[0] - G_0[0]) - (F_0[0] + 4*F_1[0] + F_del[0])*np.tan(Lambda)
+    I0_XM = (Q_0[1] + 4*Q_1[1] - 5*Q_del[1])*np.tan(Lambda) + 6*(G_del[1] - G_0[1]) - (F_0[1] + 4*F_1[1] + F_del[1])*np.tan(Lambda)
+    I0_YM = (Q_0[2] + 4*Q_1[2] - 5*Q_del[2])*np.tan(Lambda) + 6*(G_del[2] - G_0[2]) - (F_0[2] + 4*F_1[2] + F_del[2])*np.tan(Lambda)
+
+    # # Integrate from 0 -> 1/2 del
+    I1_C = (5*Q_0[0] - 16*Q_1[0] - Q_del[0])*np.tan(Lambda) + 24*(G_1[0] - G_0[0]) - (5*F_0[0] + 8*F_1[0] - F_del[0])*np.tan(Lambda)
+    I1_XM = (5*Q_0[1] - 16*Q_1[1] - Q_del[1])*np.tan(Lambda) + 24*(G_1[1] - G_0[1]) - (5*F_0[1] + 8*F_1[1] - F_del[1])*np.tan(Lambda)
+    I1_YM = (5*Q_0[2] - 16*Q_1[2] - Q_del[2])*np.tan(Lambda) + 24*(G_1[2] - G_0[2]) - (5*F_0[2] + 8*F_1[2] - F_del[2])*np.tan(Lambda)
+
+    # # Integrate from 1/2 del -> del
+    # I1_C = (-Q_0[0] - 16*Q_1[0] + 5*Q_del[0])*np.tan(Lambda) + 24*(G_del[0] - G_1[0]) - (-F_0[0] + 8*F_1[0] + 5*F_del[0])*np.tan(Lambda)
+    # I1_XM = (-Q_0[1] - 16*Q_1[1] + 5*Q_del[1])*np.tan(Lambda) + 24*(G_del[1] - G_1[1]) - (-F_0[1] + 8*F_1[1] + 5*F_del[1])*np.tan(Lambda)
+    # I1_YM = (-Q_0[2] - 16*Q_1[2] + 5*Q_del[2])*np.tan(Lambda) + 24*(G_del[2] - G_1[2]) - (-F_0[2] + 8*F_1[2] + 5*F_del[2])*np.tan(Lambda)
 
     eqns_to_solve = np.array([I0_C, I0_XM, I0_YM, I1_C, I1_XM, I1_YM])
 
@@ -184,69 +199,6 @@ def frozen_two_strip_cone_solve(initial_guess):
     print('theta N=2: ' + str(np.rad2deg(solutions[0][-1])))
     
     return solutions[0]
-
-
-def Two_Strip_Eqn_Test(input):
-
-    # Extract Unknows
-    u_0 = input[0]
-    u_1 = (input[0] + input[1])/2
-    u_del = input[1]
-
-    v_1 = input[2]/2
-    v_del = input[2]
-
-    p_0 = input[3]
-    p_1 = (input[3] + input[4])/2
-    p_del = input[4]
-
-    rho_0 = input[5]
-    rho_1 = (input[5] + input[6])/2
-    rho_del = input[6]
-
-    theta = np.deg2rad(input[7])
-    Beta = np.deg2rad(input[8])
-
-    # Because Numpy has no cot :(
-    cot_theta = 1/np.tan(theta)
-    cot_beta = 1/np.tan(Beta)
-    Lambda = Beta - theta
-    cot_Lambda = 1/np.tan(Lambda)  
-
-    # Define r_i
-    r_0 = 1 
-    r_1 = 1 + 0.5*np.tan(Lambda)*cot_theta
-    r_del = 1 + np.tan(Lambda)*cot_theta
-
-    # Energy and state equations
-    # M_inf = 8
-    # p_0 = (rho_0/(gamma*(M_inf**2)))*(1 + (1 - u_0**2)*((gamma-1)/2)*(M_inf**2))
-    # p_1 = (rho_1/(gamma*(M_inf**2)))*(1 + (1 - (u_1**2) - (v_1**2))*((gamma-1)/2)*(M_inf**2))
-
-    # Integral Relation Unknows
-    Q_0 = [rho_0*u_0*r_0, (p_0 + rho_0*(u_0**2))*r_0 , 0]
-    Q_1 = [rho_1*u_1*r_1, (p_1 + rho_1*(u_1**2))*r_1, (rho_1*u_1*v_1)*r_1]
-    Q_del = [rho_del*u_del*r_del, (p_del + rho_del*(u_del**2))*r_del, (rho_del*u_del*v_del)*r_del]
-
-    G_0 = [0, 0, 0]
-    G_1 = [(rho_1*v_1)*r_1, (rho_1*u_1*v_1)*r_1, (p_1 + rho_1*(v_1**2))*r_1]
-    G_del = [(rho_del*v_del)*r_del, (rho_del*u_del*v_del)*r_del, (p_del + rho_del*(v_del**2))*r_del]
-
-    F_0 = [0, p_0, p_0*cot_theta]
-    F_1 = [0, p_1, p_1*cot_theta]
-    F_del = [0, p_del, p_del*cot_theta]
-
-    # Integrate from 0 -> del
-    I0_C = (Q_0[0] - 4*Q_1[0] + 3*Q_del[0])*np.tan(Lambda) - 4*(-2*G_1[0] + G_del[0]) - np.tan(Lambda)*(F_0[0] - F_del[0])
-    I0_XM = (Q_0[1] - 4*Q_1[1] + 3*Q_del[1])*np.tan(Lambda) - 4*(-2*G_1[1] + G_del[1]) - np.tan(Lambda)*(F_0[1] - F_del[1])
-    I0_YM = (Q_0[2] - 4*Q_1[2] + 3*Q_del[2])*np.tan(Lambda) - 4*(-2*G_1[2] + G_del[2]) - np.tan(Lambda)*(F_0[2] - F_del[2])
-
-    # Integrate from 0 -> 1/2 del
-    I1_C = 4*(Q_1[0] - Q_del[0])*np.tan(Lambda) - 4*G_1[0] + 5*G_del[0] - np.tan(Lambda)*(2*F_1[0] + F_del[0])
-    I1_XM = 4*(Q_1[1] - Q_del[1])*np.tan(Lambda) - 4*G_1[1] + 5*G_del[1] - np.tan(Lambda)*(2*F_1[1] + F_del[1])
-    I1_YM = 4*(Q_1[2] - Q_del[2])*np.tan(Lambda) - 4*G_1[2] + 5*G_del[2] - np.tan(Lambda)*(2*F_1[2] + F_del[2])
-
-    return
 
 
 def main():
@@ -270,13 +222,13 @@ def main():
     print('\n')
 
     # 2-Strip Solving
-    # Inital Guess
-    u_0 = 0.7915200156896637 #0.7913637553006431 
-    u_1 = 0.7919718861644587
-    v_1 = -0.030536066611886743
-    rho_0 = 5.192282199293422
-    rho_1 = 5.138006805966865
-    theta = 0.5847021888888834
+    # Inital Guess   | M = 1.5 Beta = 60 | M = 8 Beta = 38.155
+    u_0 =  0.7915200156896637 #0.6684754503861963 #
+    u_1 =  0.7919718861644587 #0.6846846749618256 #
+    v_1 = -0.030536066611886743 #-0.12949087134420384 #
+    rho_0 = 5.192282199293422 #1.707469061399742 #
+    rho_1 = 5.138006805966865 #1.6485648593002313 #
+    theta = 0.5847021888888834 #0.32535828738426736 #
 
     initial_guess =  np.array([u_0, u_1, v_1, rho_0, rho_1, theta])
 
