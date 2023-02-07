@@ -99,7 +99,7 @@ class Taylor_Macoll:
 
         # Call out class variables
         Initial_Condition = self.frozen_IC()
-        theta_range = np.deg2rad([self.Beta, 0.01])
+        theta_range = np.deg2rad([self.Beta, 1])
 
         # Modify Inputs
         def ODEtoSolve(theta: float, V: list):
