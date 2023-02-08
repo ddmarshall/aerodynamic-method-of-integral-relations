@@ -10,7 +10,7 @@ class Frozen_Cone_Flow:
 
         self.Mach = Mach
         self.gamma = gamma
-        self.Beta = Beta
+        self.Beta = np.deg2rad(Beta)
 
 
     def one_strip_solve(self, full_output: bool):
@@ -32,7 +32,7 @@ class Frozen_Cone_Flow:
         # Call Class Variables
         M_inf = self.Mach
         gamma = self.gamma
-        Beta = np.deg2rad(self.Beta)
+        Beta = self.Beta
 
         m = (M_inf**2)*(np.sin(Beta))**2
         a = 5*(m-1)/(6*M_inf**2)
@@ -85,7 +85,7 @@ class Frozen_Cone_Flow:
             return eqn25
 
         # Perform solving by guessing theta~0.1
-        theta = sci.optimize.fsolve(solve_theta, [0.1])[0]
+        theta = sci.optimize.fsolve(solve_theta, [0.01])[0]
 
         # Substitue theta back to other unkowns
         cot_theta = 1/np.tan(theta)
@@ -124,7 +124,7 @@ class Frozen_Cone_Flow:
         # Call Class Variables
         M_inf = self.Mach
         gamma = self.gamma
-        Beta = np.deg2rad(self.Beta)
+        Beta = self.Beta
         
         # Extract Unknows
         u_0 = unkns[0]
@@ -217,7 +217,6 @@ class Frozen_Cone_Flow:
     def two_strip_solve(self, full_output:bool):
 
         one_strip_sol = self.one_strip_solve(full_output=True)
-        Cone_Angle_1st = one_strip_sol[0]
 
         # These can be grab from 1 strip
         u_del =  one_strip_sol[1]
@@ -228,12 +227,17 @@ class Frozen_Cone_Flow:
         rho_0 = one_strip_sol[8]
         rho_del = one_strip_sol[9]
         rho_1 = (rho_0 + rho_del)/2
-        theta = np.deg2rad(one_strip_sol[0]) #0.32535828738426736 #
+        theta = np.deg2rad(one_strip_sol[0])
 
+        # Wrap Initial guess
         initial_guess =  np.array([u_0, u_1, v_1, rho_0, rho_1, theta])
 
         solutions = sci.optimize.fsolve(self.two_strip_relations, initial_guess, full_output=True)
-        solver_msg = '\n2-Strip Solution Msg:\n'+solutions[3]
+        
+        if solutions[3] == 'The solution converged.':
+            solver_msg = 'Converged.'
+        else:
+            solver_msg = 'Not converged.'
         # print('theta N=2: ' + str(np.rad2deg(solutions[0][-1])))
         
         u_0 = solutions[0][0]
