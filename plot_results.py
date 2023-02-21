@@ -34,6 +34,7 @@ for M_inf in Mach_Range:
         # One-Strip Solution
         MIR_1 = FCF(M_inf, gamma, Beta)
         Cone_Angle_1st = FCF.one_strip_solve(MIR_1, full_output=False)
+        
         # Two-Strip Solution
         Cone_Angle_2nd, solver_msg = FCF.two_strip_solve(MIR_1, full_output=False)
 

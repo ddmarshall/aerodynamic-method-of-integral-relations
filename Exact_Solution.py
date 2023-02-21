@@ -139,8 +139,10 @@ class Taylor_Macoll:
         '''
         # Inside the shock
         M_inf = self.Mach
-        M_shock = self.M_2
+        M_shock = self.M2
         V_m2V_1 = self.V_m2V_1
+        gamma = self.gamma
+        Beta = np.deg2rad(self.Beta)
 
         # Get wave angle and specified angle [rad]
         theta = np.deg2rad(theta)
@@ -156,12 +158,18 @@ class Taylor_Macoll:
         # Density behind shock (V_1 based)
         m = (M_inf**2)*(np.sin(Beta))**2
         rho_del = (6*m)/(5 + m)
+        # Pressure at strip delta
+        p_del = (35*m - 5)/(42*(M_inf**2))
 
         # Density from isentropic relations (behind shock -> cone surface, V_max based)
         rho_2_rho_1 = ((1 + ((gamma-1)/2)*(M_shock**2))/(1 + ((gamma-1)/2)*(M_theta_Vm**2)))**(-1/(1-gamma))
         rho_theta = rho_del*rho_2_rho_1
 
-        return [v_r_theta, v_theta_theta, rho_theta]
+        # Pressure Ratio
+        p_2_p_1 = rho_2_rho_1**gamma
+        p_theta = p_del * p_2_p_1
+
+        return [v_r_theta, v_theta_theta, rho_theta, p_theta]
 
 
     def coord_trans(V_r, V_theta, angle):
