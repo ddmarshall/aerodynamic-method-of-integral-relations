@@ -311,13 +311,18 @@ class Frozen_Blunt_Flow:
         self.k = (gamma-1)/(2*gamma)
 
         self.E0_list = []
+        self.theta_list = []
     
 
-    def update_unknown(self, epsilon, sigma, v_0):
+    def update_unknown(self,theta, epsilon, sigma, v_0):
+
 
         self.v_0 = v_0
         self.sigma = sigma
         self.epsilon = epsilon
+        
+        self.theta_list.append(theta)
+        self.E0_list.append(self.E(0, theta))
         
         return
     
@@ -744,14 +749,11 @@ class Frozen_Blunt_Flow:
         # Check Singular
         if v_0**2 <= (self.gamma - 1)/(self.gamma + 1):
 
-            self.update_unknown(epsilon, sigma, v_0)
+            self.update_unknown(theta, epsilon, sigma, v_0)
 
             desp_dtheta = self.deps_dtheta(theta)
             dsig_dtheta = self.dsigma_dtheta(theta)
             dv0_dtheta = self.dv_dtheta(0, theta)
-
-            # self.E0_list.append(self.E(0, theta))
-            # print(self.E(0, theta))
 
             return [desp_dtheta, dsig_dtheta, dv0_dtheta]
         else:
@@ -762,7 +764,7 @@ class Frozen_Blunt_Flow:
     def One_Strip_Solve(self):
 
         # Start Stop Theta [0 -> theta^(0): 0.8125]
-        theta_range = [0, 0.8125]
+        theta_range = [0, 0.812]
 
         # Initial Guess
         esp_0 = 0.703 #self.epsilon_0()
