@@ -308,23 +308,7 @@ class Frozen_Blunt_Flow:
         self.w_inf = M_inf*self.c_inf
 
         # A constant from Dr.B
-        self.k = (gamma-1)/(2*gamma)
-
-        self.E0_list = []
-        self.theta_list = []
-    
-
-    def update_unknown(self,theta, epsilon, sigma, v_0):
-
-
-        self.v_0 = v_0
-        self.sigma = sigma
-        self.epsilon = epsilon
-        
-        self.theta_list.append(theta)
-        self.E0_list.append(self.E(0, theta))
-        
-        return
+        self.k = (gamma-1)/(2*gamma)    
     
 
     def epsilon_0(self):
@@ -354,7 +338,7 @@ class Frozen_Blunt_Flow:
         """
         # self.sigma = sigma
 
-        w_x = self.w_inf*(1 - (2/(self.gamma + 1))*(np.sin(self.sigma)**2)*(1 - 1/((self.M_inf**2)*(np.sin(self.sigma)**2))))
+        w_x = self.w_inf*(1 - (2/(self.gamma + 1))*(np.sin(sigma)**2)*(1 - 1/((self.M_inf**2)*(np.sin(sigma)**2))))
 
         return w_x
 
@@ -375,12 +359,12 @@ class Frozen_Blunt_Flow:
         # Store to class variable so can call in u, v function
         # self.sigma = sigma
 
-        w_y = (self.w_inf/(self.gamma + 1))*np.sin(2*self.sigma)*(1 - (1/((self.M_inf**2)*(np.sin(self.sigma)**2))))
+        w_y = (self.w_inf/(self.gamma + 1))*np.sin(2*sigma)*(1 - (1/((self.M_inf**2)*(np.sin(sigma)**2))))
 
         return w_y
 
     
-    def u(self, index: int, theta: float=0) -> float:
+    def u(self, index: int, theta: float, sigma: float) -> float:
         """ r component of w behind shock. 
             u=0 on cylinder surface.
 
@@ -393,7 +377,7 @@ class Frozen_Blunt_Flow:
             index {int}
                     -- 0: Surface
                     -- 1: Wave
-                    -- i: Intermidiate strips
+                    -- i: Intermediate strips
         Raises:
 
         Returns:
@@ -403,12 +387,12 @@ class Frozen_Blunt_Flow:
         if index == 0:
             return 0
         if index == 1:
-            return self.w_y(self.sigma)*np.sin(theta) - self.w_x(self.sigma)*np.cos(theta)
+            return self.w_y(sigma)*np.sin(theta) - self.w_x(sigma)*np.cos(theta)
         else:
             exit(f"u_{str(index)} is not a known Boundary Condition.")
     
 
-    def v(self, index: int, theta: float=0) -> float:
+    def v(self, index: int, theta: float, sigma: float) -> float:
         """ \u03B8 component of w behind shock
 
         Arguments:
@@ -420,7 +404,7 @@ class Frozen_Blunt_Flow:
             index {int}
                     -- 0: Surface
                     -- 1: Wave
-                    -- i: Intermidiate strips
+                    -- i: Intermediate strips
 
         Raises:
             SystemExit(Not a known Boundary Condition)
@@ -431,13 +415,13 @@ class Frozen_Blunt_Flow:
         if index == 0 and theta == 0:
             return 0
         if index == 1:
-            return self.w_x(self.sigma)*np.sin(theta) + self.w_y(self.sigma)*np.cos(theta)
+            return self.w_x(sigma)*np.sin(theta) + self.w_y(sigma)*np.cos(theta)
         else:
-            return self.v_0
+            return self.v_0(theta)
             # exit(f"v_{str(index)} is not a known Boundary Condition.")
 
     
-    def w(self, index, theta):
+    def w(self, index, theta, sigma):
         """ Total velocity
 
         Arguments:
@@ -449,7 +433,7 @@ class Frozen_Blunt_Flow:
             index {int}
                     -- 0: Surface
                     -- 1: Wave
-                    -- i: Intermidiate strips
+                    -- i: Intermediate strips
 
         Raises:
             SystemExit(Not a known Boundary Condition)
@@ -457,35 +441,35 @@ class Frozen_Blunt_Flow:
             w {float} -- w as a function of \u03B8 [rad]
         """
 
-        u = self.u(index,theta)
-        v = self.v(index,theta)
+        u = self.u(index, theta, sigma)
+        v = self.v(index, theta, sigma)
 
         return np.sqrt(u**2 + v**2)
 
     
-    def tau(self, index, theta):
+    def tau(self, index, theta, sigma):
 
-        return (1 - self.w(index,theta)**2)**(1/(self.gamma-1))
+        return (1 - self.w(index, theta, sigma)**2)**(1/(self.gamma-1))
 
     
-    def c(self, index, theta):
+    def c(self, index, theta, sigma):
 
-        return np.sqrt(((self.gamma-1)/2)*(1 - self.w(index, theta)**2))
+        return np.sqrt(((self.gamma-1)/2)*(1 - self.w(index, theta, sigma)**2))
     
 
-    def M(self, index, theta):
+    def M(self, index, theta, sigma):
 
-        return -self.t(index, theta)*self.u(index, theta)/self.c(index, theta)**2
+        return -self.t(index, theta, sigma)*self.u(index, theta, sigma)/self.c(index, theta, sigma)**2
 
 
-    def r(self, index):
+    def r(self, index, epsilon):
 
         xi = (self.N - index + 1)/self.N
 
-        return 1 + xi*self.epsilon
+        return 1 + xi*epsilon
 
 
-    def p(self, index: int, theta: float) -> float:
+    def p(self, index: int, theta: float, sigma: float) -> float:
 
         """ Pressure immediatly behind shock
 
@@ -496,7 +480,7 @@ class Frozen_Blunt_Flow:
             index {int}
                     -- 0: Surface
                     -- 1: Wave
-                    -- i: Intermidiate strips
+                    -- i: Intermediate strips
 
         Raises:
 
@@ -508,13 +492,13 @@ class Frozen_Blunt_Flow:
         w_inf = self.w_inf
 
         if index == 1:
-            return ((4*gamma)/((gamma**2)-1))*((1 - w_inf**2)**(gamma/(gamma-1)))*(((w_inf**2*(np.sin(self.sigma)**2))/(1 - w_inf**2)) - (gamma - 1)**2/(4*gamma))
+            return ((4*gamma)/((gamma**2)-1))*((1 - w_inf**2)**(gamma/(gamma-1)))*(((w_inf**2*(np.sin(sigma)**2))/(1 - w_inf**2)) - (gamma - 1)**2/(4*gamma))
         
         else:
-            return self.tau(index, theta)*self.phi(index)**(-1/(self.gamma-1))
+            return self.tau(index, theta, sigma)*self.phi(index, sigma)**(-1/(self.gamma-1))
 
 
-    def rho(self, index: int, theta: float) -> float:
+    def rho(self, index: int, theta: float, sigma: float) -> float:
 
         """ Density immediatly behind shock
 
@@ -533,12 +517,12 @@ class Frozen_Blunt_Flow:
         w_inf = self.w_inf
 
         if index == 1:
-            return ((gamma+1)/(gamma-1))*((1 - w_inf**2)**(1/(gamma-1)))*((w_inf**2)/(1 + (1 - w_inf**2)*(1/np.tan(self.sigma))**2))   
+            return ((gamma+1)/(gamma-1))*((1 - w_inf**2)**(1/(gamma-1)))*((w_inf**2)/(1 + (1 - w_inf**2)*(1/np.tan(sigma))**2))   
         else:
-            return (self.tau(index, theta)**(self.gamma))*self.phi(index)**(-1/(self.gamma-1))
+            return (self.tau(index, theta, sigma)**(gamma))*self.phi(index, sigma)**(-1/(gamma-1))
 
 
-    def phi(self, index) -> float:
+    def phi(self, index, sigma) -> float:
         """ Vorticity function immediatly behind shock
 
         Arguments:
@@ -555,7 +539,7 @@ class Frozen_Blunt_Flow:
         gamma = self.gamma
         w_inf = self.w_inf
 
-        omega = (w_inf**2*(np.sin(self.sigma)**2))/(1 - w_inf**2)
+        omega = (w_inf**2*(np.sin(sigma)**2))/(1 - w_inf**2)
         
         if index == 0:
             return ((4*gamma)/((gamma**2)-1))*(((gamma-1)/(gamma+1))**gamma)*(((w_inf**2)/(1 - w_inf**2)) - (((gamma - 1)**2)/(4*gamma)))*(1/(w_inf**(2*gamma)))
@@ -591,7 +575,7 @@ class Frozen_Blunt_Flow:
 
     ######                  Derivative Terms                        ######
     
-    def deps_dtheta(self, theta: float):
+    def deps_dtheta(self, theta: float, sigma: float, epsilon: float):
         """ d\u03B5/d\u03B8 :Change of shock wave distance as derivative of theta
 
         Arguments:
@@ -607,35 +591,34 @@ class Frozen_Blunt_Flow:
             d\u03B5/d\u03B8 {float}
         """
 
-        return -(1 + self.epsilon)*(1/np.tan(self.sigma + theta))
+        return -(1 + epsilon)*(1/np.tan(sigma + theta))
     
 
-    def dsigma_dtheta(self, theta:float):
+    def dsigma_dtheta(self, theta:float, sigma, epsilon):
 
-        return self.F(theta)
+        return self.F(theta, sigma, epsilon)
     
 
-    def du_dtheta(self, index, theta):
+    def du_dtheta(self, index, theta, sigma, epsilon):
 
         if index == 0:
             return 0
-        
         else:
-            t_i = self.t(index, theta)
-            t_i_prime = self.t_prime(index, theta)
-            phi_i = self.phi(index, theta)
+            t_i = self.t(index, theta, sigma)
+            t_i_prime = self.t_prime(index, theta, sigma, epsilon)
+            phi_i = self.phi(index, theta, sigma)
             return "du_i/dtheta: Not done yet. 1-strip no need"
 
 
-    def dv_dtheta(self, index, theta):
+    def dv_dtheta(self, index, theta, sigma, epsilon):
 
         gamma = self.gamma
         
         if index == 0:
-            return self.E(0, theta)/(((gamma-1)/(gamma+1)) - self.w(0,theta)**2)
+            return self.E(0, theta, sigma, epsilon)/(((gamma-1)/(gamma+1)) - self.w(0,theta, sigma)**2)
         
         else:
-            return self.E(0, theta)/(((gamma-1+2*(self.u(index, theta)**2))/(gamma+1)) - self.w(index,theta)**2)
+            return self.E(0, theta, sigma, epsilon)/(((gamma-1+2*(self.u(index, theta, sigma)**2))/(gamma+1)) - self.w(index, theta, sigma)**2)
 
 
     def dpsi_dtheta(self, index, theta):
@@ -644,97 +627,97 @@ class Frozen_Blunt_Flow:
 
     ######                  Grouped Terms                        ######
     
-    def F(self, theta):
+    def F(self, theta, sigma, epsilon):
 
-        s_prime1 = self.s_prime(1, theta)
-        rho1 = self.rho(1, theta)
-        u1 = self.u(1, theta)
-        v1 = self.v(1, theta)
+        s_prime1 = self.s_prime(1, theta, sigma, epsilon)
+        rho1 = self.rho(1, theta, sigma)
+        u1 = self.u(1, theta, sigma)
+        v1 = self.v(1, theta, sigma)
 
-        return (s_prime1 - rho1*(v1**2 - u1**2))/self.D_1(theta)
+        return (s_prime1 - rho1*(v1**2 - u1**2))/self.D_1(theta, sigma)
 
     
-    def D_1(self, theta):
+    def D_1(self, theta, sigma):
 
-        m_1 = self.m_1(theta)
-        n_1 = self.n_1(theta)
-        u_1 = self.u(1, theta)
-        v_1 = self.v(1, theta)
-        w_1 = self.w(1, theta)
+        m_1 = self.m_1(theta, sigma)
+        n_1 = self.n_1(theta, sigma)
+        u_1 = self.u(1, theta, sigma)
+        v_1 = self.v(1, theta, sigma)
+        w_1 = self.w(1, theta, sigma)
         gamma = self.gamma
-        sigma = self.sigma
         w_inf = self.w_inf
-        rho_1 = self.rho(1, theta)
+        rho_1 = self.rho(1, theta, sigma)
 
         return (4*gamma/((gamma**2)-1))*w_inf**2*(1 - w_inf**2)**(1/(gamma-1))*(u_1*v_1*np.sin(sigma))/(1 - w_1**2) + rho_1*(v_1*m_1 - u_1*(n_1 + (2*v_1/(1 - w_1**2))*(v_1*n_1 - u_1*m_1)))
 
 
-    def m_1(self, theta):
+    def m_1(self, theta, sigma):
 
-        dwydsigma = (2*self.w_inf/(self.gamma + 1))*(np.cos(2*self.sigma) + (((1/np.sin(self.sigma))**2)/(self.M_inf**2)))
-        dwxdsigma = (-2*self.w_inf/(self.gamma + 1))*np.sin(2*self.sigma)
+        dwydsigma = (2*self.w_inf/(self.gamma + 1))*(np.cos(2*sigma) + (((1/np.sin(sigma))**2)/(self.M_inf**2)))
+        dwxdsigma = (-2*self.w_inf/(self.gamma + 1))*np.sin(2*sigma)
 
         return dwydsigma*np.sin(theta) - dwxdsigma*np.cos(theta)
     
 
-    def n_1(self, theta):
+    def n_1(self, theta, sigma):
 
-        dwydsigma = (2*self.w_inf/(self.gamma + 1))*(np.cos(2*self.sigma) + (((1/np.sin(self.sigma))**2)/(self.M_inf**2)))
-        dwxdsigma = (-2*self.w_inf/(self.gamma + 1))*np.sin(2*self.sigma)
+        dwydsigma = (2*self.w_inf/(self.gamma + 1))*(np.cos(2*sigma) + (((1/np.sin(sigma))**2)/(self.M_inf**2)))
+        dwxdsigma = (-2*self.w_inf/(self.gamma + 1))*np.sin(2*sigma)
 
         return -dwxdsigma*np.sin(theta) - dwydsigma*np.cos(theta)
     
 
-    def G_1(self, theta):
+    def G_1(self, theta, sigma):
 
-        v_1 = self.v(1, theta)
-        u_1 = self.u(1, theta)
-        c_1 = self.c(1, theta)
-        n_1 = self.n_1(theta)
-        m_1 = self.m_1(theta)
+        v_1 = self.v(1, theta, sigma)
+        u_1 = self.u(1, theta, sigma)
+        c_1 = self.c(1, theta, sigma)
+        n_1 = self.n_1(theta, sigma)
+        m_1 = self.m_1(theta, sigma)
 
-        return self.tau(1,theta)*((v_1/(c_1**2))*(v_1*n_1 - u_1*m_1) - n_1)
+        return self.tau(1,theta, sigma)*((v_1/(c_1**2))*(v_1*n_1 - u_1*m_1) - n_1)
     
 
-    def E(self, index, theta):
+    def E(self, index, theta, sigma, epsilon):
 
         if index == 0:
-            return (2*(self.c(index, theta)**2)/((self.gamma + 1)*self.tau(index, theta)))*self.t_prime(index, theta)
+            
+            return (2*(self.c(index, theta, sigma)**2)/((self.gamma + 1)*self.tau(index, theta, sigma)))*self.t_prime(index, theta, sigma, epsilon)
     
         else:
-            return (2*(self.c(index, theta)**2)/((self.gamma + 1)*self.tau(index, theta)))*(self.t_prime(index, theta) - self.M(index, theta)*self.du_dtheta(index, theta))
+            return (2*(self.c(index, theta, sigma)**2)/((self.gamma + 1)*self.tau(index, theta, sigma)))*(self.t_prime(index, theta, sigma, epsilon) - self.M(index, theta, sigma)*self.du_dtheta(index, theta, sigma, epsilon))
 
 
-    def s(self, index, theta):
+    def s(self, index, theta, sigma):
 
-        return self.rho(index, theta)*self.u(index, theta)*self.v(index, theta)
+        return self.rho(index, theta, sigma)*self.u(index, theta, sigma)*self.v(index, theta, sigma)
 
 
-    def t(self, index, theta):
+    def t(self, index, theta, sigma):
 
-        return self.tau(index, theta)*self.v(index, theta)
+        return self.tau(index, theta, sigma)*self.v(index, theta, sigma)
 
     ###             MIR Relations           ###
 
-    def s_prime(self, index, theta):
+    def s_prime(self, index, theta, sigma, epsilon):
 
-        H = lambda ind: self.k*self.p(ind, theta) + self.rho(ind, theta)*(self.u(ind, theta)**2)
-        g = lambda ind: self.k*self.p(ind, theta) + self.rho(ind, theta)*(self.v(ind, theta)**2)
+        H = lambda ind: self.k*self.p(ind, theta, sigma) + self.rho(ind, theta, sigma)*(self.u(ind, theta, sigma)**2)
+        g = lambda ind: self.k*self.p(ind, theta, sigma) + self.rho(ind, theta, sigma)*(self.v(ind, theta, sigma)**2)
 
         if index == 1:
-            return (1/(self.epsilon))*(self.s(1, theta)*self.deps_dtheta(theta) + 2*H(0) - 2*(1 + self.epsilon)*H(1)) + g(0) + g(1)
+            return (1/(epsilon))*(self.s(1, theta, sigma)*self.deps_dtheta(theta, sigma, epsilon) + 2*H(0) - 2*(1 + epsilon)*H(1)) + g(0) + g(1)
         elif index == 0:
             return 0       
         else:
             return print("1-strip method no need s'(i), i=2,3,... ")
     
 
-    def t_prime(self, index, theta):
+    def t_prime(self, index, theta, sigma, epsilon):
         
-        h = lambda ind: self.tau(ind, theta)*self.u(ind, theta)
+        h = lambda ind: self.tau(ind, theta, sigma)*self.u(ind, theta, sigma)
 
         if index == 0:
-            return (1/(self.epsilon))*(self.t(1, theta) - self.t(0, theta))*self.deps_dtheta(theta) - self.G_1(theta)*self.dsigma_dtheta(theta) - (1 + (2/self.epsilon))*h(1)
+            return (1/epsilon)*(self.t(1, theta, sigma) - self.t(0, theta, sigma))*self.deps_dtheta(theta, sigma, epsilon) - self.G_1(theta, sigma)*self.dsigma_dtheta(theta, sigma, epsilon) - (1 + (2/epsilon))*h(1)
         else:
             return print("1-strip method no need t'(i), i=1,2,3,... ")
 
@@ -745,35 +728,56 @@ class Frozen_Blunt_Flow:
         epsilon = unks[0]
         sigma = unks[1] 
         v_0 = unks[2]  
+            
+        # Keep format consistent
+        self.v_0 = lambda t: v_0
 
-        # Check Singular
-        if v_0**2 <= (self.gamma - 1)/(self.gamma + 1):
+        desp_dtheta = self.deps_dtheta(theta, sigma, epsilon)
+        dsig_dtheta = self.dsigma_dtheta(theta, sigma, epsilon)
+        dv0_dtheta = self.dv_dtheta(0, theta, sigma, epsilon)
 
-            self.update_unknown(theta, epsilon, sigma, v_0)
-
-            desp_dtheta = self.deps_dtheta(theta)
-            dsig_dtheta = self.dsigma_dtheta(theta)
-            dv0_dtheta = self.dv_dtheta(0, theta)
-
-            return [desp_dtheta, dsig_dtheta, dv0_dtheta]
-        else:
-
-            return [0, 0, 0]
+        return [desp_dtheta, dsig_dtheta, dv0_dtheta]
 
 
-    def One_Strip_Solve(self):
+    def One_Strip_Solve_Sonic(self, epsilon_0):
 
-        # Start Stop Theta [0 -> theta^(0): 0.8125]
-        theta_range = [0, 0.812]
+        # Start Stop Theta [0 -> pi/2]
+        theta_range = [0, np.pi/2]
 
-        # Initial Guess
-        esp_0 = 0.703 #self.epsilon_0()
+        # Initial Guesses
         sigma_0 = np.pi/2
-        v_0 = self.v(0, theta_range[0])
+        v0_0 = self.v(0, theta_range[0], sigma_0)
+        
+        IGs = [epsilon_0, sigma_0, v0_0]
 
-        IGs = [esp_0, sigma_0, v_0]
+        # Event: Check Singular "Sonic Line"
+        def v0_sonic(t, y):          
+            return y[2] - abs(np.sqrt((self.gamma - 1)/(self.gamma + 1)))
+        # Stop when reached M=1
+        v0_sonic.terminal = True
 
-        # Run Solver
-        Flow_Solution = sci.integrate.solve_ivp(self.One_Strip_Sys, theta_range, IGs, max_step=0.001) 
+        # Run Integrate Solver
+        Flow_Solution = sci.integrate.solve_ivp(self.One_Strip_Sys, theta_range, IGs, events=[v0_sonic], dense_output=True) 
 
-        return Flow_Solution
+        # Update v_0 as a function of theta for post processing
+        self.v_0 = lambda t: Flow_Solution.sol(t)[2]
+
+        # Print sonic line information
+        E0 = self.E(0,Flow_Solution.t_events[0][0], Flow_Solution.y_events[0][0][1], Flow_Solution.y_events[0][0][0])
+
+        print(f'Epsilon_0 Guess: {epsilon_0:5.6f} Sonic line at theta = {Flow_Solution.t_events[0][0]:5.4f} E0 = {E0:5.6e}')
+
+        return Flow_Solution, E0
+
+    
+    def One_Strip_Find_epsilon_0(self):
+
+        def E0(esp0):
+            return self.One_Strip_Solve_Sonic(esp0)[1]
+        esp0_brak = [self.epsilon_0()-0.05, self.epsilon_0()+0.05]
+
+        # How tight do we want?
+        sol = sci.optimize.root_scalar(E0, x0=esp0_brak[0], x1=esp0_brak[1], method='secant', xtol=1e-12)
+        
+        print(f'Mach: {self.M_inf:3.2f} Epsilon_0: {sol.root}')
+        return sol.root

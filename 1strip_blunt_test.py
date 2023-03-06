@@ -6,22 +6,25 @@ import matplotlib.pyplot as plt
 
 case1 = FBF(3, 1.4, 1)
 
-Flow_Solution = case1.One_Strip_Solve()
+esp_0 = case1.epsilon_0()
 
-theta = Flow_Solution.t
-epsilon = Flow_Solution.y[0]
-sigma = Flow_Solution.y[1]
-v_0 = Flow_Solution.y[2]
+case1.One_Strip_Find_epsilon_0()
 
-E_0_lis = []
-# for i in range(len(case1.theta_list)):
-    # if case1.theta_list[i] == theta:
-        # E_0_lis.append(case1.E0_list[i])
+[Flow_Solution, _] = case1.One_Strip_Solve_Sonic(esp_0)
+
+# Extract Dense Output
+theta = np.linspace(Flow_Solution.t.min(), Flow_Solution.t.max())
+epsilon = Flow_Solution.sol(theta)[0]
+sigma = Flow_Solution.sol(theta)[1]
+v_0 = Flow_Solution.sol(theta)[2]
+
+# Create E_0 for plot
+E_0_lis = [case1.E(0, theta[i], sigma[i], epsilon[i]) for i in range(len(theta))]
 
 
 plt.figure()
 plt.subplot(4,1,1)
-plt.plot(case1.E0_list)
+plt.plot(theta, E_0_lis)
 plt.ylabel('E_0')
 plt.grid()
 plt.subplot(4,1,2)
