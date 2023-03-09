@@ -1,19 +1,22 @@
 from Method_of_Integral_Relations import Frozen_Blunt_Flow as FBF
 import numpy as np
+import scipy
 import matplotlib.pyplot as plt
+import sys
 
+print('\nPython: ' + sys.version)
+print('Numpy Version: ' + np.__version__)
 
 
 case1 = FBF(3, 1.4, 1)
 
-esp_0 = case1.epsilon_0()
-
-case1.One_Strip_Find_epsilon_0()
+# Solve stand off distance
+esp_0 = case1.One_Strip_Find_epsilon_0()
 
 [Flow_Solution, _] = case1.One_Strip_Solve_Sonic(esp_0)
 
 # Extract Dense Output
-theta = np.linspace(Flow_Solution.t.min(), Flow_Solution.t.max())
+theta = np.linspace(Flow_Solution.t.min(), Flow_Solution.t.max(),70)
 epsilon = Flow_Solution.sol(theta)[0]
 sigma = Flow_Solution.sol(theta)[1]
 v_0 = Flow_Solution.sol(theta)[2]

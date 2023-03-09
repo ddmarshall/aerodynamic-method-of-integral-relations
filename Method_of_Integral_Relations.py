@@ -296,6 +296,7 @@ class Frozen_Cone_Flow:
 class Frozen_Blunt_Flow:
 
     def __init__(self, M_inf, gamma, N):
+        print('Scipy Version: ' + sci.__version__)
 
         self.M_inf = M_inf
         self.gamma = gamma
@@ -606,7 +607,7 @@ class Frozen_Blunt_Flow:
         else:
             t_i = self.t(index, theta, sigma)
             t_i_prime = self.t_prime(index, theta, sigma, epsilon)
-            phi_i = self.phi(index, theta, sigma)
+            phi_i = self.phi(index, sigma)
             return "du_i/dtheta: Not done yet. 1-strip no need"
 
 
@@ -774,10 +775,10 @@ class Frozen_Blunt_Flow:
 
         def E0(esp0):
             return self.One_Strip_Solve_Sonic(esp0)[1]
-        esp0_brak = [self.epsilon_0()-0.05, self.epsilon_0()+0.05]
+        esp0_brak = [self.epsilon_0()*0.90, self.epsilon_0()*0.95]
 
         # How tight do we want?
-        sol = sci.optimize.root_scalar(E0, x0=esp0_brak[0], x1=esp0_brak[1], method='secant', xtol=1e-12)
+        sol = sci.optimize.root_scalar(E0, x0=esp0_brak[0], x1=esp0_brak[1], method='secant', xtol=1e-13)
         
         print(f'Mach: {self.M_inf:3.2f} Epsilon_0: {sol.root}')
         return sol.root
