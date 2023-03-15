@@ -752,20 +752,27 @@ class Frozen_Blunt_Flow:
         IGs = [epsilon_0, sigma_0, v0_0]
 
         # Event: Check Singular "Sonic Line"
-        def v0_sonic(t, y):          
-            return y[2] - abs(np.sqrt((self.gamma - 1)/(self.gamma + 1)))
-        # Stop when reached M=1
-        v0_sonic.terminal = True
+        def v0_pre_sonic(t, y):          
+            return y[2] - abs(np.sqrt((self.gamma - 1)/(self.gamma + 1)))*0.8
+        # Stop when reached 0.8*M=1
+        v0_pre_sonic.terminal = True
 
         # Run Integrate Solver
-        Flow_Solution = sci.integrate.solve_ivp(self.One_Strip_Sys, theta_range, IGs, events=[v0_sonic], dense_output=True) 
+        Flow_Solution = sci.integrate.solve_ivp(self.One_Strip_Sys, theta_range, IGs, events=[v0_pre_sonic], dense_output=True) 
 
         # Update v_0 as a function of theta for post processing
         self.v_0 = lambda t: Flow_Solution.sol(t)[2]
 
-        # Print sonic line information
-        E0 = self.E(0,Flow_Solution.t_events[0][0], Flow_Solution.y_events[0][0][1], Flow_Solution.y_events[0][0][0])
+        # Find theta at v0 = sonic
+        def v0_zero(t):
+            return Flow_Solution.sol(t)[2] - abs(np.sqrt((self.gamma - 1)/(self.gamma + 1)))
 
+        theta_sonic = sci.optimize.root_scalar(v0_zero, x0=Flow_Solution.t_events[0][0], x1=Flow_Solution.t_events[0][0]*1.5, method='secant')
+
+        # E0 at theta_sonic
+        E0 = self.E(0, theta_sonic.root, Flow_Solution.sol(theta_sonic.root)[1], Flow_Solution.sol(theta_sonic.root)[0])
+
+        # Print sonic line information
         print(f'Epsilon_0 Guess: {epsilon_0:5.6f} Sonic line at theta = {Flow_Solution.t_events[0][0]:5.4f} E0 = {E0:5.6e}')
 
         return Flow_Solution, E0
@@ -782,3 +789,11 @@ class Frozen_Blunt_Flow:
         
         print(f'Mach: {self.M_inf:3.2f} Epsilon_0: {sol.root}')
         return sol.root
+
+    
+    def One_Strip_Solve_Full(self):
+
+        # Return full solution from solver and dense output
+
+
+        return
