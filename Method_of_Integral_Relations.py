@@ -2,6 +2,11 @@ import numpy as np
 import scipy as sci
 # from scipy import optimize
 from scipy import integrate
+import matplotlib.pyplot as plt
+import platform
+if platform.system() == 'Darwin':
+    plt.switch_backend('MacOSX')
+
 
 
 class Frozen_Cone_Flow:
@@ -773,7 +778,7 @@ class Frozen_Blunt_Flow:
         E0 = self.E(0, theta_sonic.root, Flow_Solution.sol(theta_sonic.root)[1], Flow_Solution.sol(theta_sonic.root)[0])
 
         # Print sonic line information
-        print(f'Epsilon_0 Guess: {epsilon_0:5.6f} Sonic line at theta = {Flow_Solution.t_events[0][0]:5.4f} E0 = {E0:5.6e}')
+        print(f'Epsilon_0 Guess: {epsilon_0:5.6f} Sonic line at theta = {theta_sonic.root:5.4f} E0 = {E0:5.6e}')
 
         return Flow_Solution, E0
 
@@ -797,3 +802,33 @@ class Frozen_Blunt_Flow:
 
 
         return
+
+
+if __name__ == "__main__":
+    Mach = [3, 4, 5]
+    plt.figure(1)
+
+    for M in Mach:
+        case1 = Frozen_Blunt_Flow(M, 1.4, 1)
+        E_0_lis = []
+        esp_0 = case1.One_Strip_Find_epsilon_0()
+
+        # Plot esp0 vs E0
+        esp_0_lis = np.linspace(esp_0*0.95, esp_0*1.1, 40)
+        
+        for esp in esp_0_lis:
+            _, E0 = case1.One_Strip_Solve_Sonic(esp)
+            E_0_lis.append(E0)
+
+        _, E0_Initial_Guess = case1.One_Strip_Solve_Sonic(esp_0)
+        
+        plt.subplot(3,1,M-2)
+        plt.scatter(esp_0, E0_Initial_Guess, color='r', marker='o', linewidths=3, label='Initial Guess \u03B5_0')
+        plt.plot(esp_0_lis, E_0_lis, label=f'Mach {M}')
+        plt.ylabel('E_0')
+        plt.xlabel('\u03B5_0')
+        plt.ylim([-0.05, 0.05])
+        plt.grid()
+        plt.legend()
+    plt.show()
+    pass

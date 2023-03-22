@@ -7,9 +7,7 @@ import sys
 print('\nPython: ' + sys.version)
 print('Numpy Version: ' + np.__version__)
 
-
 case1 = FBF(3, 1.4, 1)
-
 # Solve stand off distance
 esp_0 = case1.One_Strip_Find_epsilon_0()
 
