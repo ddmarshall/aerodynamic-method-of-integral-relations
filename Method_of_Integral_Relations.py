@@ -4,6 +4,8 @@ import scipy as sci
 from scipy import integrate
 import matplotlib.pyplot as plt
 import platform
+import warnings
+warnings.filterwarnings("error")
 if platform.system() == 'Darwin':
     plt.switch_backend('MacOSX')
 
@@ -302,7 +304,8 @@ class Frozen_Blunt_Flow:
 
     def __init__(self, M_inf, gamma, N):
         print('Scipy Version: ' + sci.__version__)
-
+        print('Method of Integral Relations')
+    
         self.M_inf = M_inf
         self.gamma = gamma
         self.N = N
@@ -315,15 +318,29 @@ class Frozen_Blunt_Flow:
 
         # A constant from Dr.B
         self.k = (gamma-1)/(2*gamma)    
-    
+        print(f'{self.N}-Strip Cylinder Solution \nMach: {self.M_inf:3.2f} Gamma: {self.gamma:3.2f}\n')
+
 
     def epsilon_0(self):
 
-        # Interp from Dr.B Fig 4
+        # Interp from Dr.B Fig 4 (for 1-D interp)
         Mach_inf = [2.157664347,2.381765785,2.5105146,2.86600679,2.997974516,3.501764327,4.008773049,4.502184911,5.005724194]
 
         eps_0 = [1.2470301,0.996510823,0.914273741,0.745007653,0.698172509,0.606834414,0.550898258,0.513464762,0.477743969]
+        '''
+        # Mach_inf = [2.164985590778098,2.5144092219020173,3.0043227665706054,3.5050432276657064,4.012968299711816,4.502881844380404,5.003602305475505] 
+        
+        # eps_0 = [1.25, 0.9136690647482014, 0.6960431654676258, 0.6025179856115107, 0.5467625899280575, 0.5053956834532372, 0.46942446043165464]
 
+
+        # use 2nd order
+        # p_coeff = np.polyfit(Mach_inf, eps_0, 2)
+        # eps_0_interped = np.polyval(p_coeff, self.M_inf)
+        
+        # plt.figure()
+        # plt.scatter(Mach_inf, eps_0)
+        # plt.plot(Mach_inf, np.polyval(p_coeff, Mach_inf))
+        '''
         eps_0_interped = np.interp(self.M_inf, Mach_inf, eps_0)
 
         return eps_0_interped
@@ -454,13 +471,19 @@ class Frozen_Blunt_Flow:
 
     
     def tau(self, index, theta, sigma):
-
-        return (1 - self.w(index, theta, sigma)**2)**(1/(self.gamma-1))
+        try:
+            tau = (1 - self.w(index, theta, sigma)**2)**(1/(self.gamma-1))
+        except RuntimeWarning:
+            tau = float('NaN')
+        return tau
 
     
     def c(self, index, theta, sigma):
-
-        return np.sqrt(((self.gamma-1)/2)*(1 - self.w(index, theta, sigma)**2))
+        try:
+            c = np.sqrt(((self.gamma-1)/2)*(1 - self.w(index, theta, sigma)**2))
+        except RuntimeWarning:
+            c = float('NaN')
+        return c
     
 
     def M(self, index, theta, sigma):
@@ -745,7 +768,7 @@ class Frozen_Blunt_Flow:
         return [desp_dtheta, dsig_dtheta, dv0_dtheta]
 
 
-    def One_Strip_Solve_Sonic(self, epsilon_0):
+    def One_Strip_Solve_Sonic(self, epsilon_0, print_sol=True):
 
         # Start Stop Theta [0 -> pi/2]
         theta_range = [0, np.pi/2]
@@ -778,43 +801,85 @@ class Frozen_Blunt_Flow:
         E0 = self.E(0, theta_sonic.root, Flow_Solution.sol(theta_sonic.root)[1], Flow_Solution.sol(theta_sonic.root)[0])
 
         # Print sonic line information
-        print(f'Epsilon_0 Guess: {epsilon_0:5.6f} Sonic line at theta = {theta_sonic.root:5.4f} E0 = {E0:5.6e}')
+        if print_sol==True:
+            print(f'Epsilon_0: {epsilon_0:5.6f} \t theta_sonic: {theta_sonic.root:5.4f} \t E0: {E0:5.4e}')
+        else:
+            pass
 
         return Flow_Solution, E0
 
     
     def One_Strip_Find_epsilon_0(self):
 
-        def E0(esp0):
-            return self.One_Strip_Solve_Sonic(esp0)[1]
-        esp0_brak = [self.epsilon_0()*0.90, self.epsilon_0()*0.95]
+        # Start from esp_0 guess backward until negative
+        print("Descending From Initial Epsilon Guess...")
+        E0 = 1
+        esp0 = self.epsilon_0()
+        d_esp = .0002
+        while E0 > 0:
+            esp0 -= d_esp
+            E0 = self.One_Strip_Solve_Sonic(esp0)[1]
+            esp0_brak = [esp0 + d_esp, esp0]          
+            pass
 
-        # How tight do we want?
-        sol = sci.optimize.root_scalar(E0, x0=esp0_brak[0], x1=esp0_brak[1], method='secant', xtol=1e-13)
+        print(f"Epsilon_0 Bound Founded: [{esp0_brak[0]:5.6f} {esp0_brak[1]:5.6f}]\n\nRun Bisect for Root...")
+
+        # Now Run Bisect for root
+        def E0_func(esp0):
+            return self.One_Strip_Solve_Sonic(esp0)[1]
+
+        sol = sci.optimize.root_scalar(E0_func, bracket = esp0_brak, method='bisect', rtol=1e-13)
         
         print(f'Mach: {self.M_inf:3.2f} Epsilon_0: {sol.root}')
         return sol.root
 
     
-    def One_Strip_Solve_Full(self):
+    def One_Strip_Solve_Full(self, esp_0, theta_lis):
+        
+        # Solution Before sonic
+        sol_pre_sonic = self.One_Strip_Solve_Sonic(esp_0, print_sol=False)[0]
 
-        # Return full solution from solver and dense output
+        # Solution from 0 to sonic using dense output
+        theta_sonic = float(sol_pre_sonic.t_events[0])
 
+        # Solution after sonic line
+        theta_range_aft_sonic = [theta_sonic, theta_lis[-1]]
+        Initial_Condition = list(sol_pre_sonic.sol(theta_sonic))
+        sol_aft_sonic = sci.integrate.solve_ivp(self.One_Strip_Sys, theta_range_aft_sonic, Initial_Condition, dense_output=True)
+
+        # Build Solution output
+        epsilon, sigma, v_0 = [], [], []
+        for theta in theta_lis:
+            if theta < theta_sonic:
+                solution = sol_pre_sonic
+            elif theta > theta_sonic:
+                solution = sol_aft_sonic
+
+            epsilon.append(solution.sol(theta)[0])
+            sigma.append(solution.sol(theta)[1])
+            v_0.append(solution.sol(theta)[2])
+        
+        # Print Solution
+        print('\nSolving Full Solution...')
+        result_lis = [theta_lis, epsilon, sigma, v_0]
+        print(f'Theta\tEpsilon\tSigma\tv0')
+        for theta, epsilon, sigma, v0 in zip(*result_lis):
+            print(f'{theta:5.4f}\t{epsilon:5.4f}\t{sigma:5.4f}\t{v0:5.4f}')
 
         return
 
 
 if __name__ == "__main__":
-    Mach = [3, 4, 5]
+    Mach = [2.5, 3, 4, 5]
     plt.figure(1)
-
+    i=1
     for M in Mach:
         case1 = Frozen_Blunt_Flow(M, 1.4, 1)
         E_0_lis = []
-        esp_0 = case1.One_Strip_Find_epsilon_0()
+        esp_0 = case1.epsilon_0()
 
         # Plot esp0 vs E0
-        esp_0_lis = np.linspace(esp_0*0.95, esp_0*1.1, 40)
+        esp_0_lis = np.linspace(esp_0*0.90, esp_0*1.02, 50)
         
         for esp in esp_0_lis:
             _, E0 = case1.One_Strip_Solve_Sonic(esp)
@@ -822,13 +887,15 @@ if __name__ == "__main__":
 
         _, E0_Initial_Guess = case1.One_Strip_Solve_Sonic(esp_0)
         
-        plt.subplot(3,1,M-2)
+        plt.subplot(len(Mach),1,i)
         plt.scatter(esp_0, E0_Initial_Guess, color='r', marker='o', linewidths=3, label='Initial Guess \u03B5_0')
-        plt.plot(esp_0_lis, E_0_lis, label=f'Mach {M}')
+        plt.plot(esp_0_lis, E_0_lis, marker='o',label=f'Mach {M}')
+        plt.plot(esp_0_lis, np.zeros(len(esp_0_lis)), 'k')
         plt.ylabel('E_0')
         plt.xlabel('\u03B5_0')
-        plt.ylim([-0.05, 0.05])
+        plt.ylim([-0.1, 0.25])
         plt.grid()
         plt.legend()
+        i+=1
     plt.show()
     pass
