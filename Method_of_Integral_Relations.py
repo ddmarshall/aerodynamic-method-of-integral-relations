@@ -698,11 +698,11 @@ class Frozen_Blunt_Flow:
             # dphi1/dSigma, d2phi1/dSigma2
             dphi0_dsigma = 0
 
-            dphi1_dsigma = ((4*gamma)/((gamma**2)-1))*(((gamma-1)/(gamma+1))**gamma)*((1 - (gamma/(omega+1)))*domega_dsigma*((1+(1/omega))**gamma) - ((gamma-1)**2)/(4*gamma)*(-gamma*(1/omega**2)*((1+(1/omega))**(gamma-1))*domega_dsigma))
+            dphi1_dsigma = ((4*gamma)/((gamma**2)-1))*(((gamma-1)/(gamma+1))**gamma)*((1 - (gamma/(omega+1)))*domega_dsigma*((1+(1/omega))**gamma) - (((gamma-1)**2)/(4*gamma))*-gamma*(1/omega**2)*((1+(1/omega))**(gamma-1))*domega_dsigma)
 
             d2phi0_dsigma2 = 0
 
-            d2phi1_dsigma2 = ((4*gamma)/((gamma**2)-1))*(((gamma-1)/(gamma+1))**gamma)*((((1+(1/omega))**gamma)*((gamma/(1+(1/omega)))*domega_dsigma+d2omega_dsigma2)-gamma*((1+(1/omega))**(gamma-1))*((-omega**-2)*(domega_dsigma**2)-(omega**-3)*((gamma-1)/(1+(1/omega)))*(domega_dsigma**2) + (omega**-1)*d2omega_dsigma2)) - ((((gamma-1)**2)/(4*gamma))*(-gamma*((1+(1/omega))**(gamma-1))*(-2*(omega**-3)*(domega_dsigma**2)-(omega**-4)*((gamma-1)/(1+(1/omega)))*(domega_dsigma**2)+(omega**-2)*((1+(1/omega))**(gamma-1))*d2omega_dsigma2))))
+            d2phi1_dsigma2 = ((4*gamma)/((gamma**2)-1))*(((gamma-1)/(gamma+1))**gamma)*((((1+(1/omega))**gamma)*((gamma/(1+(1/omega)))*(-(omega**-2))*(domega_dsigma**2)+d2omega_dsigma2)-gamma*((1+(1/omega))**(gamma-1))*((-omega**-2)*(domega_dsigma**2)-(omega**-3)*((gamma-1)/(1+(1/omega)))*(domega_dsigma**2) + (omega**-1)*d2omega_dsigma2)) - ((((gamma-1)**2)/(4*gamma))*(-gamma*((1+(1/omega))**(gamma-1))*(-2*(omega**-3)*(domega_dsigma**2)-(omega**-4)*((gamma-1)/(1+(1/omega)))*(domega_dsigma**2)+(omega**-2)*((1+(1/omega))**(gamma-1))*d2omega_dsigma2))))
 
             # dlogphi1_dpsi1 = (1/self.phi(1, theta, sigma, epsilon))*dphi1_dsigma*self.dsigma_dtheta(theta, sigma, epsilon)/self.dpsi_dtheta(1, theta, sigma, epsilon)
 
@@ -713,11 +713,10 @@ class Frozen_Blunt_Flow:
                 # dlogphi_dpsi = self.Two_Strip_Interp(x=[self.psi(0, theta, epsilon), self.psi(1, theta, epsilon)], y=[0, dlogphi1_dpsi1], dydx = [d2phi0_dsigma2, 0], x_targ=self.psi(2, theta, epsilon))
             else:
                 dphi_dsigma = dphi1_dsigma
-                # dlogphi_dpsi = 0
 
-            dlogphi_dpsi = (1/phi_i)*dphi_dsigma*self.dsigma_dtheta(theta, sigma, epsilon)*(1/self.dpsi_dtheta(index, theta, sigma, epsilon))
+            dlogphi_dpsi = (1/phi_i)*dphi_dsigma*self.dsigma_dtheta(theta, sigma, epsilon)*(1/dpsi_dtheta)
 
-            du_dtheta = (s_i - (u_i*(phi_i**(-1/(gamma-1))))*t_i_prime + (s_i/(gamma-1))*dlogphi_dpsi*dpsi_dtheta)/(t_i*(phi_i**(-1/(gamma-1))))
+            du_dtheta = (s_i - (u_i*(phi_i**(-1/(gamma-1)))*t_i_prime) + (s_i/(gamma-1))*dlogphi_dpsi*dpsi_dtheta)/(t_i*(phi_i**(-1/(gamma-1))))
 
             return du_dtheta
 
@@ -1053,12 +1052,12 @@ class Frozen_Blunt_Flow:
             print(" ")
 
 
-        # Derivatives
-        desp_dtheta = self.deps_dtheta(theta, sigma, epsilon)
-        dsig_dtheta = self.dsigma_dtheta(theta, sigma, epsilon)
+        # Derivatives        
+        du2_dtheta = self.du_dtheta(2, theta, sigma, epsilon)
         dv0_dtheta = self.dv_dtheta(0, theta, sigma, epsilon)
         dv2_dtheta = self.dv_dtheta(2, theta, sigma, epsilon)
-        du2_dtheta = self.du_dtheta(2, theta, sigma, epsilon)
+        desp_dtheta = self.deps_dtheta(theta, sigma, epsilon)
+        dsig_dtheta = self.dsigma_dtheta(theta, sigma, epsilon)
         dpsi2_dtheta = self.dpsi_dtheta(2, theta, sigma, epsilon)
         # print([desp_dtheta, dsig_dtheta, dv0_dtheta, du2_dtheta, dv2_dtheta, dpsi2_dtheta])
         
