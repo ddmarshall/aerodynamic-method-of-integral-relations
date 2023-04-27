@@ -1,15 +1,16 @@
+import sys
 import numpy as np
 import scipy as sci
+import json as js
 # from scipy import optimize
 from scipy import integrate
 from scipy import interpolate
 import matplotlib.pyplot as plt
 import platform
-import warnings
-warnings.filterwarnings("error")
 if platform.system() == 'Darwin':
     plt.switch_backend('MacOSX')
-
+import warnings
+warnings.filterwarnings("error")
 
 
 class Frozen_Cone_Flow:
@@ -303,13 +304,16 @@ class Frozen_Cone_Flow:
 
 class Frozen_Blunt_Flow:
 
-    def __init__(self, M_inf, gamma, N):
+    def __init__(self, M_inf, gamma, N, cutoff):
+        print('\nPython: ' + sys.version)
         print('Scipy Version: ' + sci.__version__)
+        print('Numpy Version: ' + np.__version__)
         print('Method of Integral Relations')
     
         self.M_inf = M_inf
         self.gamma = gamma
         self.N = N
+        self.cutoff = cutoff
 
         # Freestream dimensionless Speed of Sound
         self.c_inf = np.sqrt(((gamma-1)/2)/(1 + ((gamma-1)/2)*(M_inf**2)))
@@ -319,9 +323,8 @@ class Frozen_Blunt_Flow:
 
         # A constant from Dr.B
         self.k = (gamma-1)/(2*gamma)    
-        print(f'{self.N}-Strip Cylinder Solution \nMach: {self.M_inf:3.2f} Gamma: {self.gamma:3.2f}\n')
+        print(f'{self.N}-Strip Cylinder Solution \nMach: {self.M_inf:3.2f} Gamma: {self.gamma:3.2f}\nODE cutoff at {cutoff*100}% \n')
         
-
 
     def epsilon_0(self):
 
@@ -343,7 +346,14 @@ class Frozen_Blunt_Flow:
         # plt.scatter(Mach_inf, eps_0)
         # plt.plot(Mach_inf, np.polyval(p_coeff, Mach_inf))
         '''
-        eps_0_interped = np.interp(self.M_inf, Mach_inf, eps_0)
+        # eps_0_interped = np.interp(self.M_inf, Mach_inf, eps_0)
+
+        # Fit with exponential model
+        def func(x, a, c, d):
+            return a*np.exp(-c*x)+d
+
+        popt, pcov = sci.optimize.curve_fit(func, Mach_inf, eps_0, p0=(1, 1e-6, 1))
+        eps_0_interped = func(self.M_inf, *popt)
 
         return eps_0_interped
 
@@ -449,6 +459,8 @@ class Frozen_Blunt_Flow:
             return self.v_0(theta)
         elif index == 2:
             # Return surface v
+            if self.v_2(theta) > 1:
+                print(self.v_2(theta))
             return self.v_2(theta)
         else:
             exit(f"v_{str(index)} is not a known Boundary Condition.")
@@ -505,7 +517,10 @@ class Frozen_Blunt_Flow:
 
         xi = (self.N - index + 1)/self.N
 
-        return 1 + xi*epsilon
+        if index == 0:
+            return np.ones(len(epsilon))
+        else:
+            return 1 + xi*epsilon
 
 
     def p(self, index: int, theta: float, sigma: float, epsilon) -> float:
@@ -534,7 +549,7 @@ class Frozen_Blunt_Flow:
         phi_1 = ((4*gamma)/((gamma**2)-1))*(((gamma-1)/(gamma+1))**gamma)*(omega - (((gamma-1)**2)/(4*gamma)))*(1 + (1/omega))**gamma
 
         if index == 1:
-            return ((4*gamma)/((gamma**2)-1))*((1 - w_inf**2)**(gamma/(gamma-1)))*(((w_inf**2*(np.sin(sigma)**2))/(1 - w_inf**2)) - (gamma - 1)**2/(4*gamma))
+            return ((4*gamma)/((gamma**2)-1))*((1 - w_inf**2)**(gamma/(gamma-1)))*(((w_inf**2*(np.sin(sigma)**2))/(1 - w_inf**2)) - (((gamma - 1)**2)/(4*gamma)))
         
         else:
             if theta == 0 and index == 2:
@@ -607,16 +622,9 @@ class Frozen_Blunt_Flow:
 
                 dphi0_dpsi0 = 0
 
-                phi_2 = self.Two_Strip_Interp(x=[self.psi(0, theta, epsilon),self.psi(1, theta, epsilon)],y=[phi_0, phi_1],dydx=[dphi0_dpsi0, self.dphi1_dpsi1],x_targ=self.psi(index, theta, epsilon))
+                phi_i, dphi_dpsi_i = self.Two_Strip_Interp(x=[self.psi(0, theta, epsilon),self.psi(1, theta, epsilon)],y=[phi_0, phi_1],dydx=[dphi0_dpsi0, self.dphi1_dpsi1])
 
-                # # B.C 1st derivatives
-                # right = [(1, self.dphi1_dpsi1)]
-                # left = [(1, dphi0_dpsi0)]
-
-                # # Spline Interpolation from surface and wave
-                # phi_2_psi_func = sci.interpolate.make_interp_spline(x=[self.psi(0, theta, epsilon),self.psi(1, theta, epsilon)], y=[phi_0, phi_1], bc_type=(left,right))
-
-                # phi_2 = float(phi_2_psi_func(self.psi(index, theta, epsilon)))
+                phi_2 = float(phi_i(self.psi(index, theta, epsilon)))
 
                 # print(phi_0, phi_2, phi_1)
                 return phi_2
@@ -684,39 +692,43 @@ class Frozen_Blunt_Flow:
         elif index == 2:
             s_i = self.s(index, theta, sigma, epsilon)
             t_i = self.t(index, theta, sigma)
+            s_i_prime = self.s_prime(index, theta, sigma, epsilon)
             t_i_prime = self.t_prime(index, theta, sigma, epsilon)
             u_i = self.u(index, theta, sigma)
             phi_i = self.phi(index, theta, sigma, epsilon)
             dpsi_dtheta = self.dpsi_dtheta(index, theta, sigma, epsilon)
             gamma = self.gamma    
 
+            '''
             # Omega, dOmega/dSigma, d2Omega/dSigma2
-            omega = ((self.w_inf**2)*(np.sin(sigma)**2))/(1 - self.w_inf**2)
-            domega_dsigma = ((self.w_inf**2)*(2*np.sin(sigma)*np.cos(sigma)))/(1 - self.w_inf**2)
-            d2omega_dsigma2 = 2*(self.w_inf**2)*np.cos(2*sigma)/(1 - self.w_inf**2)
+            # omega = ((self.w_inf**2)*(np.sin(sigma)**2))/(1 - self.w_inf**2)
+            # domega_dsigma = ((self.w_inf**2)*(2*np.sin(sigma)*np.cos(sigma)))/(1 - self.w_inf**2)
+            # d2omega_dsigma2 = 2*(self.w_inf**2)*np.cos(2*sigma)/(1 - self.w_inf**2)
 
             # dphi1/dSigma, d2phi1/dSigma2
-            dphi0_dsigma = 0
+            # dphi0_dsigma = 0
 
-            dphi1_dsigma = ((4*gamma)/((gamma**2)-1))*(((gamma-1)/(gamma+1))**gamma)*((1 - (gamma/(omega+1)))*domega_dsigma*((1+(1/omega))**gamma) - (((gamma-1)**2)/(4*gamma))*-gamma*(1/omega**2)*((1+(1/omega))**(gamma-1))*domega_dsigma)
+            # dphi1_dsigma = ((4*gamma)/((gamma**2)-1))*(((gamma-1)/(gamma+1))**gamma)*((1 - (gamma/(omega+1)))*domega_dsigma*((1+(1/omega))**gamma) - (((gamma-1)**2)/(4*gamma))*-gamma*(1/omega**2)*((1+(1/omega))**(gamma-1))*domega_dsigma)
 
-            d2phi0_dsigma2 = 0
+            # d2phi0_dsigma2 = 0
 
-            d2phi1_dsigma2 = ((4*gamma)/((gamma**2)-1))*(((gamma-1)/(gamma+1))**gamma)*((((1+(1/omega))**gamma)*((gamma/(1+(1/omega)))*(-(omega**-2))*(domega_dsigma**2)+d2omega_dsigma2)-gamma*((1+(1/omega))**(gamma-1))*((-omega**-2)*(domega_dsigma**2)-(omega**-3)*((gamma-1)/(1+(1/omega)))*(domega_dsigma**2) + (omega**-1)*d2omega_dsigma2)) - ((((gamma-1)**2)/(4*gamma))*(-gamma*((1+(1/omega))**(gamma-1))*(-2*(omega**-3)*(domega_dsigma**2)-(omega**-4)*((gamma-1)/(1+(1/omega)))*(domega_dsigma**2)+(omega**-2)*((1+(1/omega))**(gamma-1))*d2omega_dsigma2))))
+            # d2phi1_dsigma2 = ((4*gamma)/((gamma**2)-1))*(((gamma-1)/(gamma+1))**gamma)*((((1+(1/omega))**gamma)*((gamma/(1+(1/omega)))*(-(omega**-2))*(domega_dsigma**2)+d2omega_dsigma2)-gamma*((1+(1/omega))**(gamma-1))*((-omega**-2)*(domega_dsigma**2)-(omega**-3)*((gamma-1)/(1+(1/omega)))*(domega_dsigma**2) + (omega**-1)*d2omega_dsigma2)) - ((((gamma-1)**2)/(4*gamma))*(-gamma*((1+(1/omega))**(gamma-1))*(-2*(omega**-3)*(domega_dsigma**2)-(omega**-4)*((gamma-1)/(1+(1/omega)))*(domega_dsigma**2)+(omega**-2)*((1+(1/omega))**(gamma-1))*d2omega_dsigma2))))
 
             # dlogphi1_dpsi1 = (1/self.phi(1, theta, sigma, epsilon))*dphi1_dsigma*self.dsigma_dtheta(theta, sigma, epsilon)/self.dpsi_dtheta(1, theta, sigma, epsilon)
+            '''
+            dphi0_dpsi0 = 0
 
-            # Get dphi_i/dsigma from interpolation
             if theta > 0:
-                dphi_dsigma = self.Two_Strip_Interp(x=[self.psi(0, theta, epsilon), self.psi(1, theta, epsilon)], y=[dphi0_dsigma, dphi1_dsigma], dydx = [d2phi0_dsigma2, d2phi1_dsigma2], x_targ=self.psi(2, theta, epsilon))
+                phi_i, dphi_dpsi_i = self.Two_Strip_Interp(x=[self.psi(0, theta, epsilon),self.psi(1, theta, epsilon)],y=[self.phi(0, theta, sigma, epsilon), self.phi(1, theta, sigma, epsilon)],dydx=[dphi0_dpsi0, self.dphi1_dpsi1])
 
-                # dlogphi_dpsi = self.Two_Strip_Interp(x=[self.psi(0, theta, epsilon), self.psi(1, theta, epsilon)], y=[0, dlogphi1_dpsi1], dydx = [d2phi0_dsigma2, 0], x_targ=self.psi(2, theta, epsilon))
+                phi_i = phi_i(self.psi(index, theta, epsilon))
+
+                dlogphi_dpsi = (1/phi_i)*dphi_dpsi_i(self.psi(index, theta, epsilon))
+
             else:
-                dphi_dsigma = dphi1_dsigma
+                dlogphi_dpsi = 0
 
-            dlogphi_dpsi = (1/phi_i)*dphi_dsigma*self.dsigma_dtheta(theta, sigma, epsilon)*(1/dpsi_dtheta)
-
-            du_dtheta = (s_i - (u_i*(phi_i**(-1/(gamma-1)))*t_i_prime) + (s_i/(gamma-1))*dlogphi_dpsi*dpsi_dtheta)/(t_i*(phi_i**(-1/(gamma-1))))
+            du_dtheta = (s_i_prime - (u_i*(phi_i**(-1/(gamma-1)))*t_i_prime) + (s_i/(gamma-1))*dlogphi_dpsi*dpsi_dtheta)/(t_i*(phi_i**(-1/(gamma-1))))
 
             return du_dtheta
 
@@ -808,11 +820,24 @@ class Frozen_Blunt_Flow:
 
     def s(self, index, theta, sigma, epsilon):
 
+        # if self.N == 2:
+        #     if index == 1:
+        #         return self.s1(theta)
+        #     if index == 2:
+        #         return self.s2(theta)
+        # else:
         return self.rho(index, theta, sigma, epsilon)*self.u(index, theta, sigma)*self.v(index, theta, sigma)
 
 
     def t(self, index, theta, sigma):
-
+        # if self.N == 2:
+        #     if index == 0:
+        #         return self.t0(theta)
+            # if index == 1:
+                # return self.t1(theta)
+            # if index == 2:
+                # return self.t2(theta)
+            # else:
         return self.tau(index, theta, sigma)*self.v(index, theta, sigma)
 
     ###             MIR Relations           ###
@@ -887,8 +912,8 @@ class Frozen_Blunt_Flow:
 
     def One_Strip_Solve_Sonic(self, epsilon_0, print_sol=True):
 
-        # Start Stop Theta [0 -> pi/2]
-        theta_range = [0, np.pi/2]
+        # Start Stop Theta [0 -> 1.125] (paper)
+        theta_range = [0, 1.125]
 
         # Initial Guesses
         sigma_0 = np.pi/2
@@ -898,7 +923,7 @@ class Frozen_Blunt_Flow:
 
         # Event: Check Singular "Sonic Line"
         def v0_pre_sonic(t, y):          
-            return y[2] - abs(np.sqrt((self.gamma - 1)/(self.gamma + 1)))*0.8
+            return y[2] - abs(np.sqrt((self.gamma - 1)/(self.gamma + 1)))*self.cutoff
         # Stop when reached 0.8*M=1
         v0_pre_sonic.terminal = True
 
@@ -912,40 +937,67 @@ class Frozen_Blunt_Flow:
         def v0_zero(t):
             return Flow_Solution.sol(t)[2] - abs(np.sqrt((self.gamma - 1)/(self.gamma + 1)))
 
-        theta_sonic = sci.optimize.root_scalar(v0_zero, x0=Flow_Solution.t_events[0][0], x1=Flow_Solution.t_events[0][0]*1.5, method='secant')
+        if len(Flow_Solution.t_events[0]) == 0:
+            print('No theta sonic found -> lower esp by 1%...')
+            return None
+
+        try:
+            theta_sonic = sci.optimize.root_scalar(v0_zero, x0=Flow_Solution.t_events[0][0], x1=Flow_Solution.t_events[0][0]*1.5, method='secant')
+            if theta_sonic.converged == False or np.isclose(Flow_Solution.sol(theta_sonic.root)[2], np.sqrt((self.gamma - 1)/(self.gamma + 1))) == False or theta_sonic.root < 0 or theta_sonic.root > 1:
+                print('v_0 sonic not convering -> lower esp by 1%...')
+                return None
+        except IndexError:
+            print('v_0 sonic not found -> lower esp by 1%...')
+            return None
 
         # E0 at theta_sonic
         E0 = self.E(0, theta_sonic.root, Flow_Solution.sol(theta_sonic.root)[1], Flow_Solution.sol(theta_sonic.root)[0])
 
         # Print sonic line information
         if print_sol==True:
-            print(f'Epsilon_0: {epsilon_0:5.6f} \t theta_sonic: {theta_sonic.root:5.4f} \t E0: {E0:5.4e}')
+            print(f'Eps_0: {epsilon_0:5.6f}\ttheta_s: {theta_sonic.root:6.4f} v0_conv: {theta_sonic.converged} v0_s: {self.v_0(theta_sonic.root):6.4f} E0:{E0:5.4e}')
 
-        return Flow_Solution, E0
+        return Flow_Solution, E0, theta_sonic
 
     
     def One_Strip_Find_epsilon_0(self):
 
         # Start from esp_0 guess backward until negative
-        print("Descending From Initial Epsilon Guess...")
-        E0_multi = 1
         esp0 = self.epsilon_0()
-        d_esp = .0002
-        while E0_multi > 0:
-            E0 = self.One_Strip_Solve_Sonic(esp0, print_sol=False)[1]
-            esp0 -= d_esp
-            E0_next = self.One_Strip_Solve_Sonic(esp0)[1]
-            E0_multi = E0*E0_next
-            esp0_brak = [esp0 + d_esp, esp0]          
-            pass
+        E0 = 1
+        d_esp = .0001
+        print(f"Aescending From Initial Epsilon Guess, step:{d_esp}...")
+
+        while E0 > 0 or np.isnan(E0):
+            solver_out = self.One_Strip_Solve_Sonic(esp0, print_sol=True)
+
+            if solver_out == None:
+                esp0 *= 0.99
+                        
+            else:
+                esp0_brak = [esp0-d_esp, esp0]
+                esp0 += d_esp
+                try:
+                    E0 = solver_out[1]
+                except TypeError:
+                    continue
 
         print(f"Epsilon_0 Bound Founded: [{esp0_brak[0]:5.6f} {esp0_brak[1]:5.6f}]\n\nRun Bisect for Root...")
 
         # Now Run Bisect for root
         def E0_func(esp0):
-            return self.One_Strip_Solve_Sonic(esp0)[1]
+            try:
+                Flow_Solution, E0, theta_sonic = self.One_Strip_Solve_Sonic(esp0, print_sol=True)
+            except TypeError:
+                return 0.1
 
-        sol = sci.optimize.root_scalar(E0_func, bracket = esp0_brak, method='bisect', rtol=1e-13)
+            if theta_sonic.converged == False or np.isnan(E0):
+                return 0.1
+            else:
+                return E0
+
+        sol = sci.optimize.root_scalar(E0_func, bracket = esp0_brak, method='bisect')
+
         esp_0 = sol.root
         
         print(f'Mach: {self.M_inf:3.2f} Epsilon_0: {sol.root}')
@@ -955,23 +1007,23 @@ class Frozen_Blunt_Flow:
     def One_Strip_Solve_Full(self, esp_0, theta_lis, print_sol=True):
         
         # Solution Before sonic
-        sol_pre_sonic = self.One_Strip_Solve_Sonic(esp_0, print_sol=False)[0]
+        sol_pre_sonic,_,theta_sonic = self.One_Strip_Solve_Sonic(esp_0, print_sol=False)
 
         # Solution from 0 to sonic using dense output
-        theta_sonic = float(sol_pre_sonic.t_events[0])
-        theta_lis = sorted(np.append(theta_lis, theta_sonic))
+        theta_lis = sorted(np.append(theta_lis, theta_sonic.root))
 
-        # Solution after sonic line
-        theta_range_aft_sonic = [theta_sonic, theta_lis[-1]]
-        Initial_Condition = list(sol_pre_sonic.sol(theta_sonic))
+        # Solution after sonic line theta_lis[theta_lis.index(theta_sonic.root)+1]
+        theta_range_aft_sonic = [theta_sonic.root+0.001, theta_lis[-1]]
+        Initial_Condition = list(sol_pre_sonic.sol(theta_sonic.root+0.001))
+
         sol_aft_sonic = sci.integrate.solve_ivp(self.One_Strip_Sys, theta_range_aft_sonic, Initial_Condition, dense_output=True)
 
         # Return Dense Output functions, pack pre and aft sonic line
         def switch_func(t, index):
             index = int(index)
-            if t <= theta_sonic:
+            if t <= theta_sonic.root:
                 return sol_pre_sonic.sol(t)[index]
-            elif t > theta_sonic:
+            elif t > theta_sonic.root:
                 return sol_aft_sonic.sol(t)[index]
 
         def epsilon(t):
@@ -982,24 +1034,80 @@ class Frozen_Blunt_Flow:
             index=1
             return switch_func(t, index) if np.shape(t) == () else np.array(list(map(switch_func, t, index*np.ones(len(t)))))
 
-        # def v0(t):
-        #     index=2
-        #     return switch_func(t, index) if np.shape(t) == () else np.array(list(map(switch_func, t, index*np.ones(len(t)))))
 
         # Define internal v_0(theta) for post process
         self.v_0 = lambda t: switch_func(t, 2) if np.shape(t) == () else np.array(list(map(switch_func, t, 2*np.ones(len(t)))))
 
+        # Solved functions
+        v1 = self.v(1, theta_lis, sigma(theta_lis))
+        p1 = self.p(1, theta_lis, sigma(theta_lis), epsilon(theta_lis))
+        p0 = self.p(0, theta_lis, sigma(theta_lis), epsilon(theta_lis))
+
+        # Create dicitonary data
+        data_dict = {'theta':list(theta_lis), 'epsilon':list(epsilon(theta_lis)), 'sigma':list(sigma(theta_lis)), 'kai': list(np.pi/2 - sigma(theta_lis)), 'v0':list(self.v_0(theta_lis)), 'v1':list(v1), 'p1':list(p1), 'p0':list(p0), 'p0/p0(0)': list(p0/p0[0])}
+
+        # write to json
+        self.result_file = f'data/N{self.N}_M{int(self.M_inf)}_cut{int(self.cutoff*100)}_result.json'
+        with open(self.result_file, 'w') as file:
+            js.dump(data_dict, file, indent=4)
+
         # Print Solution from functions
         if print_sol == True:
             print('\nSolving Full Solution...')
-            result_lis = [theta_lis, epsilon(theta_lis), sigma(theta_lis), self.v_0(theta_lis)]
-            print(f'Theta\tEpsilon\tSigma\tv0', end = '')
-            for theta, epsilon_rslt, sigma_rslt, v0_rslt in zip(*result_lis):
-                print(f'\n{theta:5.4f}\t{epsilon_rslt:5.4f}\t{sigma_rslt:5.4f}\t{v0_rslt:5.4f}', end = '')
-                if theta == theta_sonic:
-                    print(f" <- N={self.N} Sonic Point", end = '')
+            result_lis = [theta_lis, epsilon(theta_lis), sigma(theta_lis), self.v_0(theta_lis), v1, p0, p1]
 
-        return epsilon, sigma, self.v_0, theta_sonic
+            print(f'Theta\tEpsilon\tSigma\tv0\tv1\tp0\tp1', end = '')
+            for theta, epsilon_rslt, sigma_rslt, v0_rslt, v1, p0, p1 in zip(*result_lis):
+                if theta == theta_sonic.root:
+                    print(f'\033[0;31m \n{theta:5.4f}\t{epsilon_rslt:5.4f}\t{sigma_rslt:5.4f}\t{v0_rslt:5.4f}\t{v1:5.4f}\t{p0:5.4f}\t{p1:5.4f}\x1b[0m', end = '')
+                else:
+                    print(f'\n{theta:5.4f}\t{epsilon_rslt:5.4f}\t{sigma_rslt:5.4f}\t{v0_rslt:5.4f}\t{v1:5.4f}\t{p0:5.4f}\t{p1:5.4f}', end = '')
+
+        return epsilon, sigma, self.v_0, theta_sonic.root
+
+
+    def plot_properties(self, *vars):
+        
+        file = open(self.result_file)
+        resutls = js.load(file)
+
+        figure_lis = {}
+        for i, var in enumerate(vars):
+            fig, ax = plt.subplots(len([var]))
+            ax.plot(resutls['theta'], resutls[var], '-o',color='black',linewidth=0.5, label=f'N={self.N} cut:{int(100*self.cutoff)}%',markersize=3)
+            ax.grid(True)
+            ax.set_xlabel('theta [rad]')
+            ax.set_ylabel(var)
+            ax.set_title(f'N{self.N} M{int(self.M_inf)} Cutoff: {int(100*self.cutoff)}%')
+            ax.legend()
+
+            figure_lis[var] = fig
+
+        file.close()
+        return figure_lis
+
+    
+    def plot_compare(self, figures:dict, Mach=3, N=1, fig_lable='--*'):
+
+        vars = list(figures.keys())
+        if Mach == 3 and N == 1:
+            file = open('data/M3_epsilon_N1-3_OMB1958.json')
+            OMB_shock_geo = js.load(file)
+            data_dict = OMB_shock_geo['N=1']
+        else:
+            file = open(f'data/N3_M345_shock_geo_OMB1959.json')
+            OMB_shock_geo = js.load(file)
+            data_dict = OMB_shock_geo[f'Mach={Mach}']
+        
+        for var in vars:
+            if var in data_dict:
+                figures[var].axes[0].plot(data_dict['theta'], data_dict[var], fig_lable,color='black',linewidth=0.5, label=f'OMB N={N}',markersize=3)
+                figures[var].axes[0].legend()
+            else:    
+                pass
+
+        file.close()
+        return figures
 
 
     def Two_Strip_Sys(self, theta, unks: list):
@@ -1010,6 +1118,7 @@ class Frozen_Blunt_Flow:
         u_2 = unks[3]
         v_2 = unks[4]
         psi_2 = unks[5]
+        psi_1 = unks[6]
 
         kai = -sigma + np.pi/2
 
@@ -1021,11 +1130,11 @@ class Frozen_Blunt_Flow:
 
         # Terms for phi to avoid recrusion maximum
         gamma = self.gamma
-        omega = ((self.w_inf**2)*(np.sin(sigma)**2))/(1 - self.w_inf**2)
+        omega = ((self.w_inf**2)/(1 - self.w_inf**2))*(np.sin(sigma)**2)
 
         domega_dsigma = ((self.w_inf**2)*(2*np.sin(sigma)*np.cos(sigma)))/(1 - self.w_inf**2)
 
-        dphi1_dsigma = ((4*gamma)/((gamma**2)-1))*(((gamma-1)/(gamma+1))**gamma)*((1 - (gamma/(omega+1)))*domega_dsigma*((1+(1/omega))**gamma) - ((gamma-1)**2)/(4*gamma)*(-gamma*(1/omega**2)*((1+(1/omega))**(gamma-1))*domega_dsigma))
+        dphi1_dsigma = ((4*gamma)/((gamma**2)-1))*(((gamma-1)/(gamma+1))**gamma)*((1 - (gamma/(omega+1)))*domega_dsigma*((1+(1/omega))**gamma) - (((gamma-1)**2)/(4*gamma))*(-gamma*(1/omega**2)*((1+(1/omega))**(gamma-1))*domega_dsigma))
 
         # Initialize Pressure and Density for phi2(0)
         if theta == 0:
@@ -1035,22 +1144,23 @@ class Frozen_Blunt_Flow:
 
         # Get derivative for quadratic interpolation
         if theta > 0:
-            self.dphi1_dpsi1 = dphi1_dsigma*self.dsigma_dtheta(theta, sigma, epsilon)*(1/self.dpsi_dtheta(1, theta, sigma, epsilon))
+            if np.isnan(self.dsigma_dtheta(theta, sigma, epsilon)):
+                print('')
+            self.dphi1_dpsi1 = dphi1_dsigma*self.dsigma_dtheta(theta, sigma, epsilon)*(1/self.dpsi_dtheta(1, theta, sigma, epsilon))   
         else:
             self.dphi1_dpsi1 = 0
 
-        if theta == 0.0625 or theta == 0:
-            print(f'theta: {theta}')
-            print("    p      rho     phi      psi")
+        if theta == 0.1250 or theta == 0:
+            print(f'theta: {theta} kai: {kai}')
+            print("    p      rho     phi      psi      s")
 
-            print(f'0: {self.p(0, theta, sigma,epsilon):5.4f}, {self.rho(0, theta, sigma,epsilon):5.4f}, {self.phi(0, theta, sigma,epsilon):5.4f}, {self.psi(0, theta, epsilon)}')
+            print(f'0: {self.p(0, theta, sigma,epsilon):5.4f}, {self.rho(0, theta, sigma,epsilon):5.4f}, {self.phi(0, theta, sigma,epsilon):5.4f}, {self.psi(0, theta, epsilon)}, {self.s(0, theta, sigma, epsilon)}')
 
-            print(f'2: {self.p(2, theta, sigma,epsilon):5.4f}, {self.rho(2, theta, sigma,epsilon):5.4f}, {self.phi(2, theta, sigma,epsilon):5.4f}, {self.psi(2, theta, epsilon)}')
+            print(f'2: {self.p(2, theta, sigma,epsilon):5.4f}, {self.rho(2, theta, sigma,epsilon):5.4f}, {self.phi(2, theta, sigma,epsilon):5.4f}, {self.psi(2, theta, epsilon)}, {self.s(2, theta, sigma, epsilon)}')
 
-            print(f'1: {self.p(1, theta, sigma,epsilon):5.4f}, {self.rho(1, theta, sigma,epsilon):5.4f}, {self.phi(1, theta, sigma,epsilon):5.4f}, {self.psi(1, theta, epsilon)}')
+            print(f'1: {self.p(1, theta, sigma,epsilon):5.4f}, {self.rho(1, theta, sigma,epsilon):5.4f}, {self.phi(1, theta, sigma,epsilon):5.4f}, {self.psi(1, theta, epsilon)}, {self.s(1, theta, sigma, epsilon)}')
 
             print(" ")
-
 
         # Derivatives        
         du2_dtheta = self.du_dtheta(2, theta, sigma, epsilon)
@@ -1059,9 +1169,9 @@ class Frozen_Blunt_Flow:
         desp_dtheta = self.deps_dtheta(theta, sigma, epsilon)
         dsig_dtheta = self.dsigma_dtheta(theta, sigma, epsilon)
         dpsi2_dtheta = self.dpsi_dtheta(2, theta, sigma, epsilon)
-        # print([desp_dtheta, dsig_dtheta, dv0_dtheta, du2_dtheta, dv2_dtheta, dpsi2_dtheta])
+        dpsi1_dtheta = self.dpsi_dtheta(1, theta, sigma, epsilon)
         
-        return [desp_dtheta, dsig_dtheta, dv0_dtheta, du2_dtheta, dv2_dtheta, dpsi2_dtheta]
+        return [desp_dtheta, dsig_dtheta, dv0_dtheta, du2_dtheta, dv2_dtheta, dpsi2_dtheta, dpsi1_dtheta]
 
     
     def Two_Strip_Solve(self, epsilon_0, u2_0):
@@ -1070,20 +1180,23 @@ class Frozen_Blunt_Flow:
         epsilon_0 = 0.708 #self.epsilon_0()
         u2_0 = -0.122 #self.u(1, 0, np.pi/2)/2
 
+        # Initial Guess of Grouped Terms
+        s1_0, s2_0, t0_0, t1_0, t2_0 = 0, 0, 0, 0, 1e-8
+
         # Initial conditions
-        v0_0, v2_0, psi2_0 = 0, 1e-15, 0
+        v0_0, v2_0, psi2_0 = 0, 1e-8, 0
         sigma_0 = np.pi/2
 
         # Theta range
-        theta_range = [0, 0.0625]
-        Initial_Condition = [epsilon_0, sigma_0, v0_0, u2_0, v2_0, psi2_0]
+        theta_range = [0, 0.1250]
+        Initial_Condition = [epsilon_0, sigma_0, v0_0, u2_0, v2_0, psi2_0, 0]#, s1_0, s2_0[s1_0, , t0_0, t1_0, t2_0]
 
-        Flow_Solution = sci.integrate.solve_ivp(self.Two_Strip_Sys, theta_range, Initial_Condition)
+        Flow_Solution = sci.integrate.solve_ivp(self.Two_Strip_Sys, theta_range, Initial_Condition)#, first_step=0.00001, atol = 1, rtol = 1)
         
         return
     
 
-    def Two_Strip_Interp(self, x, y, dydx, x_targ):
+    def Two_Strip_Interp(self, x, y, dydx):
         '''
         Format:
         x = [x0 x1]
@@ -1092,19 +1205,24 @@ class Frozen_Blunt_Flow:
         xtarg = x2
         '''
         # B.C 1st derivatives
-        left = [(1, dydx[0])]
-        right = [(1, dydx[1])]
+        left = (1, dydx[0])
+        right = (1, dydx[1])
 
         # Spline Interpolation from surface and wave
-        func = sci.interpolate.make_interp_spline(x,y, bc_type=(left,right))
+        # func = sci.interpolate.CubicSpline(x,y, bc_type=(left,right))
 
-        y2 = func(x_targ)
+        # 1-D
+        func = sci.interpolate.UnivariateSpline(x,y, k=1)
 
-        return float(y2)
+        d_func = func.derivative(1)
+
+        # y2 = func(x_targ)
+
+        return func, d_func
 
 
 
-def Blunt_E0_vs_esp0(Mach=[]): 
+def Blunt_E0_vs_esp0_test(Mach=[]): 
 
     fig, axs = plt.subplots(len(Mach), figsize=(9,16))
     fig.suptitle('E0 v.s. \u03B5_0')
@@ -1115,13 +1233,23 @@ def Blunt_E0_vs_esp0(Mach=[]):
         esp_0 = case1.epsilon_0()
 
         # Plot esp0 vs E0
-        esp_0_lis = np.linspace(esp_0*0.90, esp_0*1.02, 50)
+        if M == 3:
+            esp_0_lis = np.arange(esp_0*0.97, esp_0*1.01, 0.0001)
+        else:
+            esp_0_lis = np.arange(esp_0*0.95, esp_0*0.98, 0.0001)
         
+        E0 = 1
         for esp in esp_0_lis:
-            _, E0 = case1.One_Strip_Solve_Sonic(esp)
+            # if E0 > 0:
+            _, E0, theta_sonic = case1.One_Strip_Solve_Sonic(esp)
+                # if theta_sonic.converged == True:
             E_0_lis.append(E0)
+                # else:
+                    # E_0_lis.append(float('nan'))
+            # else:
+            #     E_0_lis.append(float('nan'))
 
-        _, E0_Initial_Guess = case1.One_Strip_Solve_Sonic(esp_0)
+        E0_Initial_Guess = case1.One_Strip_Solve_Sonic(esp_0)[1]
         
         axs[i].scatter(esp_0, E0_Initial_Guess, color='r', marker='o', linewidths=3, label='Initial Guess \u03B5_0')
         axs[i].plot(esp_0_lis, E_0_lis, marker='o',label=f'Mach {M}')
@@ -1135,22 +1263,24 @@ def Blunt_E0_vs_esp0(Mach=[]):
     return fig
 
 
+
 def plot_function(theta, *funcs):
 
     fig, axs = plt.subplots(len(funcs))
 
     for i, func in enumerate(funcs):
-        axs[i].plot(theta, func(theta))
+        axs[i].plot(theta, func(theta), '-o')
+        axs[i].grid(True)
 
     return fig
 
 
 if __name__ == "__main__":
-
+    # Two Strip Testing
     case1 = Frozen_Blunt_Flow(M_inf=3, gamma=1.4, N=2)
 
-    epsilon_0 = 0.5
-    u2_0 = case1.u(1, 0, np.pi/2)/2
+    epsilon_0 = 0.7086
+    u2_0 = -0.122
 
     # Initial Guesses
     sigma_0 = np.pi/2

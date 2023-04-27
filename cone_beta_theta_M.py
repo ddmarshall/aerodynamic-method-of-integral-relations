@@ -1,4 +1,4 @@
-from Exact_Solution import Taylor_Macoll as TM
+from TM_Exact_Solution import Taylor_Macoll as TM
 from Method_of_Integral_Relations import Frozen_Cone_Flow as FCF
 import numpy as np
 import matplotlib.pyplot as plt

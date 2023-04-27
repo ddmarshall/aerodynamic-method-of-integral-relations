@@ -77,7 +77,7 @@ class Taylor_Macoll:
         # Mach after shock
         M_2 = np.sqrt((((gamma+1)**2)*(M_inf**4)*(np.sin(Beta)**2) - 4*((M_inf**2)*(np.sin(Beta)**2) - 1)*(gamma*(M_inf**2)*(np.sin(Beta)**2) + 1))/((2*gamma*(M_inf**2)*(np.sin(Beta)**2) - (gamma-1))*((gamma-1)*(M_inf**2)*(np.sin(Beta)**2) + 2)))
 
-        # Assign to calss variable
+        # Assign to calss attribute
         self.M2 = M_2
 
         # Non demensioned total velocity: v = V/V_max
