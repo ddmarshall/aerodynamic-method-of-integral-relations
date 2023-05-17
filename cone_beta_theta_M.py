@@ -2,12 +2,13 @@ from TM_Exact_Solution import Taylor_Macoll as TM
 from Method_of_Integral_Relations import Frozen_Cone_Flow as FCF
 import numpy as np
 import matplotlib.pyplot as plt
+import tikzplotlib as tikz
 
 gamma = 1.4
 
 Mach_Range = [1.5, 2, 2.5, 4, 10]
 
-plt.figure(1)
+beta_mach_theta_diag = plt.figure(1)
 
 my_labels = {"x1" : "Taylor-Macoll", "x2" : "1-Strip MIR", "x3" : "2-Strip MIR"}
 for M_inf in Mach_Range:
@@ -69,6 +70,5 @@ plt.xlabel('$\\theta$ [deg]')
 plt.ylabel('$\\beta$ [deg]')
 plt.grid()
 plt.legend()
-plt.show()
 
-
+tikz.save('tikzs/beta_mach_theta_diag.tikz', axis_height='9cm', axis_width='14cm')

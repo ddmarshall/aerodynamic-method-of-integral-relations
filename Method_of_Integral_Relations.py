@@ -2,7 +2,6 @@ import sys
 import numpy as np
 import scipy as sci
 import json as js
-# from scipy import optimize
 from scipy import integrate
 from scipy import interpolate
 import matplotlib.pyplot as plt
@@ -11,6 +10,7 @@ if platform.system() == 'Darwin':
     plt.switch_backend('MacOSX')
 import warnings
 warnings.filterwarnings("error")
+import tikzplotlib as tikz
 
 
 class Frozen_Cone_Flow:
@@ -124,6 +124,8 @@ class Frozen_Cone_Flow:
         v_max = (u_del**2 + v_del**2)**0.5
 
         if full_output == True:
+            print(f'\nMach: {self.Mach}, Beta: {self.Beta:5.4f}')
+            print(f'Cone Angle: {np.rad2deg(theta):5.4f} \nu_del: {u_del:5.4f} \nu_0: {u_0:5.4f} \nv_del: {v_del:5.4f} \np_0: {p_0:5.4f} \np_del:{p_del:5.4f} \nT_0: {T_0:5.4f} \nT_del: {T_del:5.4f} \nrho_0: {rho_0:5.4f} \nrho_del: {rho_del:5.4f}')
             return [np.rad2deg(theta), u_del, u_0, v_del, p_0, p_del, T_0, T_del, rho_0, rho_del]
         else:
             return np.rad2deg(theta)
@@ -332,7 +334,7 @@ class Frozen_Blunt_Flow:
         # Interp from Dr.B Fig 4 (for 1-D interp)
         Mach_inf = [2.157664347,2.381765785,2.5105146,2.86600679,2.997974516,3.501764327,4.008773049,4.502184911,5.005724194]
 
-        eps_0 = [1.2470301,0.996510823,0.914273741,0.745007653,0.698172509,0.606834414,0.550898258,0.513464762,0.477743969]
+        esp_0 = [1.2470301,0.996510823,0.914273741,0.745007653,0.698172509,0.606834414,0.550898258,0.513464762,0.477743969]
         '''
         # Mach_inf = [2.164985590778098,2.5144092219020173,3.0043227665706054,3.5050432276657064,4.012968299711816,4.502881844380404,5.003602305475505] 
         
@@ -353,8 +355,22 @@ class Frozen_Blunt_Flow:
         def func(x, a, c, d):
             return a*np.exp(-c*x)+d
 
-        popt, pcov = sci.optimize.curve_fit(func, Mach_inf, eps_0, p0=(1, 1e-6, 1))
+        popt, pcov = sci.optimize.curve_fit(func, Mach_inf, esp_0, p0=(1, 1e-6, 1))
         eps_0_interped = func(self.M_inf, *popt)
+
+        esp = [func(M, *popt) for M in np.linspace(2,5)]
+
+        # fig, ax = plt.subplots()
+        # ax.grid()
+        # ax.scatter(Mach_inf, esp_0, color='black',label='OMB 1959')
+        # ax.plot(np.linspace(2,5), esp,color='black', label='Interpolated', linewidth=0.75)
+        # t = ax.text(2.9, 0.8, f'f(x)={popt[0]:4.2f}exp({-popt[1]:4.3f}x) + {popt[2]:4.3f}')
+        # t.set_backgroundcolor('white')
+        # ax.set_xlabel('$M_{\infty}$')
+        # ax.set_ylabel('$\\varepsilon_{0}$')
+        # ax.legend()
+        # ax.set_xlim(2,5)
+        # tikz.save('tikzs/veps0_vs_mach.tex', axis_height='9cm', axis_width='11cm')
 
         return eps_0_interped
 
@@ -893,7 +909,7 @@ class Frozen_Blunt_Flow:
                 return (-t_1_prime/2) + (1/epsilon)*(2*(t1 - t2)*self.deps_dtheta(theta, sigma, epsilon) + (2+epsilon)*h(2) - 2.5*(1+epsilon)*h(1))
 
 
-    ###         Slover Functions            ###
+    ###         Slover Methods            ###
 
     def One_Strip_Sys(self, theta, unks: list):
 
@@ -943,6 +959,7 @@ class Frozen_Blunt_Flow:
 
         try:
             theta_sonic = sci.optimize.root_scalar(v0_zero, x0=Flow_Solution.t_events[0][0], x1=Flow_Solution.t_events[0][0]*1.5, method='secant')
+            
             if theta_sonic.converged == False or np.isclose(Flow_Solution.sol(theta_sonic.root)[2], np.sqrt((self.gamma - 1)/(self.gamma + 1))) == False or theta_sonic.root < 0 or theta_sonic.root > 1:
                 print('v_0 sonic not convering...', end = '')
                 return None
@@ -965,12 +982,11 @@ class Frozen_Blunt_Flow:
         # Start from esp_0 guess backward until negative
         esp0 = self.epsilon_0()
         print('Check Initial Guess from interpolation...')
-        # Check the very first guess is not negative
-        test_output = self.One_Strip_Solve_Sonic(esp0)
         try:
-            if test_output[1] < 0:
+            while self.One_Strip_Solve_Sonic(esp0)[1] < 0:
                 esp0 *= 0.99
                 print('*esp0 too big -> lower esp by 1%...')
+
         except TypeError:
             esp0 *= 0.99
             print('*Invalid E0 -> lower esp by 1%...')
@@ -981,11 +997,22 @@ class Frozen_Blunt_Flow:
 
         while E0 > 0 or np.isnan(E0):
             solver_out = self.One_Strip_Solve_Sonic(esp0, print_sol=True)
-
-            if solver_out == None:  
+            
+            if solver_out == None:
                 esp0 *= 0.99
                 print('-> lower esp by 1%...')
-                        
+
+                neg_E0 = True
+                while neg_E0 == True:
+                    try:
+                        if self.One_Strip_Solve_Sonic(esp0)[1] > 0:
+                            neg_E0 = False
+                        else:
+                            esp0 *= 0.99    
+                    except TypeError:
+                        esp0 *= 0.99
+                        continue
+
             else:
                 esp0_brak = [esp0-d_esp, esp0]
                 esp0 += d_esp
@@ -1052,7 +1079,14 @@ class Frozen_Blunt_Flow:
         def w1_sonic_func(theta):
             return self.w(1, theta, sigma(theta)) - abs(np.sqrt((self.gamma - 1)/(self.gamma + 1)))
         
-        w1_sonic = sci.optimize.root_scalar(w1_sonic_func, x0=0, x1=v0_sonic.root, method='secant')
+        # search 1st w1 sonic
+        w1_serach = 0
+        t = 0.7
+        while self.w(1, t, sigma(t)) < abs(np.sqrt((self.gamma - 1)/(self.gamma + 1))):
+            t_brak = [t, t+0.01]
+            t += 0.01
+
+        w1_sonic = sci.optimize.root_scalar(w1_sonic_func, bracket=t_brak, method='bisect')
 
         if w1_sonic.root > 0 and np.isclose(self.w(1, w1_sonic.root, sigma(w1_sonic.root)), abs(np.sqrt((self.gamma - 1)/(self.gamma + 1)))) == True:
             theta_lis = sorted(np.append(theta_lis, w1_sonic.root))
@@ -1067,7 +1101,7 @@ class Frozen_Blunt_Flow:
         p0 = self.p(0, theta_lis, sigma(theta_lis), epsilon(theta_lis))
 
         # Create dicitonary data
-        data_dict = {'theta':list(theta_lis), 'epsilon':list(epsilon(theta_lis)), 'sigma':list(sigma(theta_lis)), 'kai': list(np.pi/2 - sigma(theta_lis)), 'v0':list(self.v_0(theta_lis)), 'v1':list(v1), 'p1':list(p1), 'p0':list(p0), 'p0/p0(0)': list(p0/p0[0]),'sonic': {'theta':v0_sonic.root, 'epsilon':epsilon(v0_sonic.root), 'sigma':sigma(v0_sonic.root), 'kai': np.pi/2 - sigma(v0_sonic.root), 'v0':self.v_0(v0_sonic.root), 'v1':self.v(1, v0_sonic.root, sigma(v0_sonic.root)), 'p1':self.p(1, v0_sonic.root, sigma(v0_sonic.root), epsilon(v0_sonic.root)), 'p0': self.p(0, v0_sonic.root, sigma(v0_sonic.root), epsilon(v0_sonic.root)), 'p0/p0(0)': self.p(0, v0_sonic.root, sigma(v0_sonic.root), epsilon(v0_sonic.root))/p0[0]}}
+        data_dict = {'theta':list(theta_lis), 'epsilon':list(epsilon(theta_lis)), 'sigma':list(sigma(theta_lis)), 'kai': list(np.pi/2 - sigma(theta_lis)), 'v0':list(self.v_0(theta_lis)), 'v1':list(v1), 'w1':list(w1),'p1':list(p1), 'p0':list(p0), 'p0/p0(0)': list(p0/p0[0]),'sonic': {'theta':v0_sonic.root, 'theta_w1s': w1_sonic.root, 'w1s':self.w(1, w1_sonic.root, sigma(w1_sonic.root)),'epsilon':epsilon(v0_sonic.root), 'sigma':sigma(v0_sonic.root), 'kai': np.pi/2 - sigma(v0_sonic.root), 'v0':self.v_0(v0_sonic.root), 'v1':self.v(1, v0_sonic.root, sigma(v0_sonic.root)), 'p1':self.p(1, v0_sonic.root, sigma(v0_sonic.root), epsilon(v0_sonic.root)), 'p0': self.p(0, v0_sonic.root, sigma(v0_sonic.root), epsilon(v0_sonic.root)), 'p0/p0(0)': self.p(0, v0_sonic.root, sigma(v0_sonic.root), epsilon(v0_sonic.root))/p0[0]}}
 
         # write to json
         self.result_file = f'results/N{self.N}_M{int(self.M_inf)}_cut{int(self.cutoff*100)}_result.json'
@@ -1084,32 +1118,38 @@ class Frozen_Blunt_Flow:
                 if theta == v0_sonic.root:
                     print(f'\n{theta:5.4f}\t{epsilon_rslt:5.4f}\t{sigma_rslt:5.4f}\t\033[0;31m{v0_rslt:5.4f}\x1b[0m\t{v1:5.4f}\t{u1:6.4f}\t{w1:6.4f}\t{p0:5.4f}\t{p1:5.4f} <- v0 sonic', end = '')
                 elif theta == w1_sonic.root:
-                    print(f'\n{theta:5.4f}\t{epsilon_rslt:5.4f}\t{sigma_rslt:5.4f}\t{v0_rslt:5.4f}\t{v1:5.4f}\t{u1:6.4f}\t\033[0;31m{w1:6.4f}\x1b[0m\t{p0:5.4f}\t{p1:5.4f} <- v1 sonic', end = '')
+                    print(f'\n{theta:5.4f}\t{epsilon_rslt:5.4f}\t{sigma_rslt:5.4f}\t{v0_rslt:5.4f}\t{v1:5.4f}\t{u1:6.4f}\t\033[0;31m{w1:6.4f}\x1b[0m\t{p0:5.4f}\t{p1:5.4f} <- w1 sonic', end = '')
                 else:
                     print(f'\n{theta:5.4f}\t{epsilon_rslt:5.4f}\t{sigma_rslt:5.4f}\t{v0_rslt:5.4f}\t{v1:5.4f}\t{u1:6.4f}\t{w1:6.4f}\t{p0:5.4f}\t{p1:5.4f}', end = '')
         print('\n')
         return epsilon, sigma, self.v_0, v0_sonic.root, w1_sonic.root, theta_lis
 
+    ###         Plot Methods            ###
 
     def plot_properties(self, *vars):
         
         file = open(self.result_file)
         resutls = js.load(file)
-        symbols = {'theta':"$\\"+'theta$','kai':"$\\"+'chi$', 'epsilon':"$\\"+'varepsilon$', 'v0': '$v_{0}$'}
+        symbols = {'theta':"$\\"+'theta$','kai':"$\\"+'chi$', 'epsilon':"$\\"+'varepsilon$', 'v0': '$u_{0}$', 'w1': '$w_{1}$','p0/p0(0)': '$p_{0}/p_{0}(0)$'}
         figure_lis = {}
         for i, var in enumerate(vars):
             fig, ax = plt.subplots(len([var]))
-            ax.plot(resutls['theta'], resutls[var], '-o',color='black',linewidth=0.5, label=f'M{int(self.M_inf)} N={self.N} cut:{int(100*self.cutoff)}%',markersize=4)
-            ax.plot(resutls['sonic']['theta'], resutls['sonic'][var], 'o',color='red',linewidth=0.5, label=f'$v_{0}$ Sonic', markersize=5)
+            ax.plot(resutls['theta'], resutls[var], '-o',color='black',linewidth=0.5, label=f'N={self.N}, $\kappa$:{self.cutoff}',markersize=4)
+            if var == 'w1':
+                ax.plot(resutls['sonic']['theta_w1s'], resutls['sonic']['w1s'], 'o',color='red',linewidth=0.5, label=f'$w_{1}*$', markersize=5)
+            else:
+                ax.plot(resutls['sonic']['theta'], resutls['sonic'][var], 'o',color='red',linewidth=0.5, label=f'$u_{0}^*$', markersize=5)
+
             ax.grid(True)
-            ax.set_xlabel(f"{symbols['theta']}")
+            ax.set_xlabel(f"{symbols['theta']} [rad]")
             if var in symbols:
                 ax.set_ylabel(symbols[var])
             else:
                 ax.set_ylabel(var)
-            ax.set_title(f'N{self.N} M{int(self.M_inf)} Cutoff: {int(100*self.cutoff)}%')
+            # ax.set_title(f'N{self.N} M{int(self.M_inf)} $\kappa$: {self.cutoff}%')
             ax.legend()
 
+            # Add Newtonian to pressure
             if var == 'p0/p0(0)':
                 newton_p = np.cos(resutls['theta'])**2
                 ax.plot(resutls['theta'], newton_p, linestyle='dashdot',color='black',linewidth=0.5, label=f'Newtonian',markersize=4)
@@ -1120,15 +1160,25 @@ class Frozen_Blunt_Flow:
         file.close()
         return figure_lis
 
-    
+        
     def plot_compare(self, figures:dict, Mach=3, N=1, fig_lable='--*'):
 
         vars = list(figures.keys())
+        file3 = open('data/Kim_1955.json')
+        Kim_exp = js.load(file3)
+        file3.close()
+
+        # PLot Kim Edxperimental Pressure, special case for M6
+        if Mach == 6 and f'Mach={Mach}' in Kim_exp['Pressure'] and 'p0/p0(0)' in figures:
+            figures['p0/p0(0)'].axes[0].plot(Kim_exp['Pressure'][f'Mach={Mach}']['theta'], Kim_exp['Pressure'][f'Mach={Mach}']['p0/p0(0)'], linestyle=':', color='black',linewidth=0.75, label=f'Kim 1955', markersize=4)
+            figures['p0/p0(0)'].axes[0].legend()
+
+        # See if it Mach 3 N 1 special case
         if Mach == 3 and N == 1:
             file = open('data/M3_epsilon_N1-3_OMB1958.json')
-            file2 = open(f'data/N3_M345_flow_prop_OMB1959.json')
+            file2 = open('data/N3_M345_flow_prop_OMB1959.json')
             OMB_shock_geo = js.load(file)
-            data_dict = OMB_shock_geo['N=1']
+            shock_geo = OMB_shock_geo['N=1']
         else:
             file = open(f'data/N3_M345_shock_geo_OMB1959.json')
             file2 = open(f'data/N3_M345_flow_prop_OMB1959.json')
@@ -1139,13 +1189,17 @@ class Frozen_Blunt_Flow:
                 file2.close()
                 return None
             else:
-                data_dict = OMB_shock_geo[f'Mach={Mach}']
+                shock_geo = OMB_shock_geo[f'Mach={Mach}']
                 flow_prop = OMB_shock_prop[f'Mach={Mach}']
-                
-        
+                      
         for var in vars:
-            if var in data_dict:
-                figures[var].axes[0].plot(data_dict['theta'], data_dict[var], fig_lable,color='black',linewidth=0.5, label=f'OMB N={N}',markersize=4)
+            if var in shock_geo:
+                figures[var].axes[0].plot(shock_geo['theta'], shock_geo[var], fig_lable,color='black',linewidth=0.5, label=f'OMB N={N}',markersize=4)
+                
+                # PLot Kim Edxperimental Pressure
+                if var == 'p0/p0(0)' and f'Mach={Mach}' in Kim_exp['Pressure']:
+                    figures[var].axes[0].plot(Kim_exp['Pressure'][f'Mach={Mach}']['theta'], Kim_exp['Pressure'][f'Mach={Mach}']['p0/p0(0)'], linestyle=':', color='black',linewidth=0.75, label=f'Kim 1955', markersize=4)
+
                 figures[var].axes[0].legend()
                 
             elif var == 'v0' and N == 3:
@@ -1154,6 +1208,7 @@ class Frozen_Blunt_Flow:
                 
             else:
                 pass
+            # tikz.save(f'tikzs/Mach{Mach}_Cut{self.cutoff}_{var}.tex')
 
         file.close()
         file2.close()
@@ -1166,61 +1221,116 @@ class Frozen_Blunt_Flow:
         # Define Theta points
         theta_surface = np.linspace(0, v0_sonic, n)
         theta_wave = np.linspace(0, w1_sonic, n)
-        
 
         #Define Polar Coordinates
         r0 = np.ones(n)
         r1 = r0 + epsilon(theta_wave)
 
-        eta = np.arange(0, 1 + 0.25, 0.25,)
-        theta_coord = [theta_surface + (theta_wave-theta_surface)*eta_i for eta_i in eta]
-        r_coord = [r0 + (r1 - r0)*eta_i for eta_i in eta]
+        xi = [0, .25, .5, .75, 1]
+        theta_coord = [theta_surface + (theta_wave-theta_surface)*xi_i for xi_i in xi]
+        r_coord = [r0 + (r1 - r0)*xi_i for xi_i in xi]
         sonic_theta = [t_row[-1] for t_row in theta_coord]
         sonic_r = [r_row[-1] for r_row in r_coord]
 
-        xx = np.multiply(r_coord, np.cos(theta_coord))
+        xx = -np.multiply(r_coord, np.cos(theta_coord))
         yy = np.multiply(r_coord, np.sin(theta_coord))
-        x_sonic = np.multiply(sonic_r, np.cos(sonic_theta))
+        x_sonic = -np.multiply(sonic_r, np.cos(sonic_theta))
         y_sonic = np.multiply(sonic_r, np.sin(sonic_theta))
 
         # Build Mach informations
-        v = np.array([v0(theta_surface) + (self.v(1, theta_wave, sigma(theta_wave))-v0(theta_surface))*eta_i for eta_i in eta])
-        u = np.array([0 + (self.u(1, theta_wave, sigma(theta_wave))-0)*eta_i for eta_i in eta])
-        
-        p_p0 = np.array([self.p(0, theta_surface, sigma(theta_surface), epsilon(theta_surface)) + (self.p(1, theta_wave, sigma(theta_wave), epsilon(theta_wave)) - self.p(0, theta_surface, sigma(theta_surface), epsilon(theta_surface)))*eta_i for eta_i in eta])/self.p(0, 0, sigma(0), epsilon(0))
+        v = np.array([v0(theta_surface) + (self.v(1, theta_wave, sigma(theta_wave))-v0(theta_surface))*xi_i for xi_i in xi])
+        u = np.array([0 + (self.u(1, theta_wave, sigma(theta_wave))-0)*xi_i for xi_i in xi])
 
         Mach = np.sqrt(v**2 + u**2)/abs(np.sqrt((self.gamma - 1)/(self.gamma + 1)))
+
+        # Build Pressure informations
+        p_p0 = np.array([self.p(0, theta_surface, sigma(theta_surface), epsilon(theta_surface)) + (self.p(1, theta_wave, sigma(theta_wave), epsilon(theta_wave)) - self.p(0, theta_surface, sigma(theta_surface), epsilon(theta_surface)))*xi_i for xi_i in xi])/self.p(0, 0, sigma(0), epsilon(0))
+
+        # Build stream functions
+        psi = np.array([0 + (self.psi(1, theta_wave, epsilon(theta_wave))-0)*xi_i for xi_i in xi])
+
+        # Load OMB shock shapes
+        file = open('data/N3_M345_shock_geo_OMB1959.json')
+        file2 = open('data/Kim_1955.json')
+        file3 = open('data/N3_M345_flow_prop_OMB1959.json')
+        OMB_shock = js.load(file)
+        Kim_shock = js.load(file2)
+        OMB_prop = js.load(file3)
+        file.close()
+        file2.close()
+        file3.close()
 
         # Make mach number contour polt
         Mach_contour, Mach_ax = plt.subplots()
         Mach_contour.set_size_inches(7.5, 7.5)
-        # mach_prof = Mach_ax.contourf(xx,yy,Mach,levels=20, cmap='jet')
         mach_prof = Mach_ax.contour(xx,yy,Mach,levels=15, cmap='jet', linewidths=0.75)
-        Mach_ax.plot(np.linspace(0,1,100), np.sqrt(1 - (np.linspace(0,1,100)**2)), linewidth=1, color='black')
-        Mach_ax.plot(r_coord[-1]*np.cos(theta_coord[-1]), r_coord[-1]*np.sin(theta_coord[-1]), linewidth=1, color='black')
+        Mach_ax.plot(-np.linspace(0,1,100), np.sqrt(1 - (np.linspace(0,1,100)**2)), linewidth=1, color='black')
+        Mach_ax.plot(-r_coord[-1]*np.cos(theta_coord[-1]), r_coord[-1]*np.sin(theta_coord[-1]), linewidth=1, color='black', label=f'M{int(self.M_inf)} N={self.N} $\kappa$:{self.cutoff}')
         Mach_ax.plot(x_sonic, y_sonic, color='darkred', linewidth=0.75)
-        Mach_ax.text(x_sonic[2], y_sonic[2], 'Mach 1', rotation=np.rad2deg(np.arctan2([y_sonic[0], y_sonic[-1]], [x_sonic[0], x_sonic[-1]])[1])+2, bbox=dict(facecolor='white', edgecolor='none'), rotation_mode = 'anchor')
-        Mach_ax.fill_between(np.linspace(0,1,100),np.sqrt(1 - (np.linspace(0,1,100)**2)), hatch="//",linewidth=0.5, alpha=0.0)
-        Mach_ax.clabel(mach_prof, inline=1, fontsize=10, colors='black')
-        Mach_ax.set_xlim(0,2)
-        Mach_ax.set_ylim(0,2)
-        Mach_ax.invert_xaxis()
+        Mach_ax.text(x_sonic[2], y_sonic[2], 'Mach 1', rotation=np.rad2deg(np.arctan2([y_sonic[0], y_sonic[-1]], [x_sonic[0], x_sonic[-1]])[1])+180, bbox=dict(facecolor='white', edgecolor='none'), rotation_mode = 'anchor')
+        Mach_ax.fill_between(-np.linspace(0,1,100),np.sqrt(1 - (np.linspace(0,1,100)**2)), hatch="//",linewidth=0.5, alpha=0.0)
+        # Add OMB shock Predictions ans Sonic Line
+        if f'Mach={self.M_inf}' in OMB_shock:
+            Mach_ax.plot(OMB_shock[f'Mach={self.M_inf}']['shock']['x'], OMB_shock[f'Mach={self.M_inf}']['shock']['y'], color='black', linestyle='--', linewidth=1, label='OMB '+'N='+str(OMB_shock[f'Mach={self.M_inf}']['shock']['N'])+' Shock')
 
+            Mach_ax.plot(OMB_shock[f'Mach={self.M_inf}']['sonic-line']['x'], OMB_shock[f'Mach={self.M_inf}']['sonic-line']['y'], color='black', linestyle='-.', linewidth=1, label='OMB '+'N='+str(OMB_shock[f'Mach={self.M_inf}']['shock']['N'])+' Sonic Line')
+        
+        if f'Mach={self.M_inf}' in Kim_shock["shock-shape"]:
+            Mach_ax.plot(Kim_shock["shock-shape"][f'Mach={self.M_inf}']['x'], Kim_shock["shock-shape"][f'Mach={self.M_inf}']['y'], color='black', linestyle=':', linewidth=1, label='Kim Exp. Shock')
+        Mach_ax.clabel(mach_prof, inline=1, fontsize=10, colors='black')
+        Mach_ax.set_xlim(-2,0)
+        Mach_ax.set_ylim(0, 2)
+        Mach_ax.set_xticks([0, -1, -2])
+        Mach_ax.set_yticks([0, 1, 2])
+        Mach_ax.legend(loc='upper center', bbox_to_anchor=(0.5, -.1))
+        tikz.save(f'tikzs/Mach{case.M_inf}_Contour_cut{case.cutoff}_Mach.tex', axis_height='11cm', axis_width='11cm')
+
+        '''
+        # Plot and compare at each xi and compare to OMB
+        Mach_plot, Mach_plot_ax = plt.subplots()
+        
+        for i, xi_i in enumerate(xi):
+            OMB_Mach = np.sqrt(np.array(OMB_prop[f'Mach={self.M_inf}'][f'xi={xi_i}']['u'])**2 + np.array(OMB_prop[f'Mach={self.M_inf}'][f'xi={xi_i}']['v'])**2)/abs(np.sqrt((self.gamma - 1)/(self.gamma + 1)))
+
+            Mach_plot_ax.plot(theta_coord[i], Mach[i], color='black', linewidth=0.75)
+            Mach_plot_ax.plot(OMB_prop[f'Mach={self.M_inf}']['theta'], OMB_Mach, '--', color='black', linewidth=0.75)
+
+        Mach_plot_ax.set_xlim(0, max(theta_coord[-1]))
+        Mach_plot_ax.set_ylim(0, max(Mach[-1]))
+        Mach_plot_ax.grid(True)
+        '''
+        
         # Make Pressure/Stagnation P  contour polt
         p2p0_contour, p2p0_ax = plt.subplots()
         p2p0_contour.set_size_inches(7, 7.9)
         p2p0_prof = p2p0_ax.contourf(xx, yy, p_p0,levels=100, cmap='jet')
-        p2p0_ax.plot(np.linspace(0,1,100), np.sqrt(1 - (np.linspace(0,1,100)**2)), linewidth=1, color='black')
-        p2p0_ax.plot(r_coord[-1]*np.cos(theta_coord[-1]), r_coord[-1]*np.sin(theta_coord[-1]), linewidth=1, color='black')
-        p2p0_ax.fill_between(np.linspace(0,1,100),np.sqrt(1 - (np.linspace(0,1,100)**2)), hatch="//",linewidth=0.5, alpha=0.0)
-        p2p0_ax.set_xlim(0,2)
-        p2p0_ax.set_ylim(0,2)
+        p2p0_ax.plot(-np.linspace(0,1,100), np.sqrt(1 - (np.linspace(0,1,100)**2)), linewidth=1, color='black')
+        p2p0_ax.plot(-r_coord[-1]*np.cos(theta_coord[-1]), r_coord[-1]*np.sin(theta_coord[-1]), linewidth=1, color='black')
+        p2p0_ax.fill_between(-np.linspace(0,1,100),np.sqrt(1 - (np.linspace(0,1,100)**2)), hatch="//",linewidth=0.5, alpha=0.0)
+        p2p0_ax.set_xlim(-2,0)
+        p2p0_ax.set_ylim(0, 2)
+        Mach_ax.set_xticks([0, -1, -2])
+        Mach_ax.set_yticks([0, 1, 2])
         p2p0_cbar = p2p0_contour.colorbar(p2p0_prof, fraction=0.05, pad=0.08,location='bottom')
         p2p0_cbar.ax.set_xlabel('p/p_stag')
-        p2p0_ax.invert_xaxis()
-        
-        return Mach_contour, p2p0_contour
+        tikz.save(f'tikzs/Mach{case.M_inf}_Contour_cut{case.cutoff}_Press.tex', axis_height='11cm', axis_width='11cm')
 
+        # Streamline polt
+        psi_contour, psi_ax = plt.subplots()
+        psi_contour.set_size_inches(7.5, 7.5)
+        psi_prof = psi_ax.contour(xx, yy, psi, levels=20, colors='black', linewidths=0.75)
+        psi_ax.plot(-np.linspace(0,1,100), np.sqrt(1 - (np.linspace(0,1,100)**2)), linewidth=1, color='black')
+        psi_ax.plot(-r_coord[-1]*np.cos(theta_coord[-1]), r_coord[-1]*np.sin(theta_coord[-1]), linewidth=1, color='black')
+        psi_ax.fill_between(-np.linspace(0,1,100),np.sqrt(1 - (np.linspace(0,1,100)**2)), hatch="//",linewidth=0.5, alpha=0.0)
+        psi_ax.set_xlim(-2,0)
+        psi_ax.set_ylim(0, 2)
+        Mach_ax.set_xticks([0, -1, -2])
+        Mach_ax.set_yticks([0, 1, 2])
+        tikz.save(f'tikzs/Mach{case.M_inf}_Streamline_cut{case.cutoff}.tex', axis_height='11cm', axis_width='11cm')
+        
+        return Mach_contour, p2p0_contour, psi_contour
+
+    ###         2-Strip Functions (NOT DONE YET!)       ###
 
     def Two_Strip_Sys(self, theta, unks: list):
 
@@ -1333,54 +1443,55 @@ class Frozen_Blunt_Flow:
         return func, d_func
 
 
+###  1- Strip Testing and plotting Subroutines
 
 def Blunt_E0_vs_esp0_test(Mach=[]): 
 
-    fig, axs = plt.subplots(len(Mach), figsize=(9,16))
-    fig.suptitle('E0 v.s. \u03B5_0')
+    fig, axs = plt.subplots(len(Mach))
+    linestyle=['-','--','-.']
+    text_x = [0.69, 0.5318, 0.47]
+    for c, cutoff in enumerate([0.93, 0.94, 0.95]):
+        for i, M in enumerate(Mach):
+            case1 = Frozen_Blunt_Flow(M, 1.4, 1, cutoff)
+            E_0_lis = []
+            esp_0 = case1.epsilon_0()
 
-    for i, M in enumerate(Mach):
-        case1 = Frozen_Blunt_Flow(M, 1.4, 1, 0.95)
-        E_0_lis = []
-        esp_0 = case1.epsilon_0()
+            # Plot esp0 vs E0
+            if M == 3:
+                esp_0_lis = np.arange(esp_0*0.99, esp_0*1.01, 0.00025)
+                
+            elif M == 5:
+                esp_0_lis = np.arange(esp_0*0.935, esp_0*0.941, 0.00025)
+            else:
+                esp_0_lis = np.arange(esp_0*0.99, esp_0*1.001, 0.00025)
+            
+            E0 = 1
+            for esp in esp_0_lis:
+                # if E0 > 0:
+                try:
+                    _, E0, theta_sonic = case1.One_Strip_Solve_Sonic(esp)
+                except TypeError:
+                    E_0_lis.append(float('nan'))
+                    continue
+                    # if theta_sonic.converged == True:
+                E_0_lis.append(E0)
 
-        # Plot esp0 vs E0
-        if M == 3:
-            esp_0_lis = np.arange(esp_0*0.97, esp_0*1.01, 0.0005)
-        else:
-            esp_0_lis = np.arange(esp_0*0.95, esp_0*1.05, 0.0005)
+            axs[i].plot(esp_0_lis, E_0_lis, linestyle[c], color='black', linewidth=0.75,label=f'$\kappa$: {cutoff}')
+            axs[i].plot(esp_0_lis, np.zeros(len(esp_0_lis)), color='black', linewidth=0.5)
+            axs[i].set_ylabel('$E_{0}$')
+            axs[i].set_ylim([-0.025, 0.025])
+            axs[i].grid()
+            if c == 2:
+                fig.axes[i].text(text_x[i],0.018,f'Mach {M}',color='black',bbox=dict(facecolor='white', edgecolor='grey'))
+            # axs[i].legend()
         
-        E0 = 1
-        for esp in esp_0_lis:
-            # if E0 > 0:
-            try:
-                _, E0, theta_sonic = case1.One_Strip_Solve_Sonic(esp)
-            except TypeError:
-                continue
-                # if theta_sonic.converged == True:
-            E_0_lis.append(E0)
-                # else:
-                    # E_0_lis.append(float('nan'))
-            # else:
-            #     E_0_lis.append(float('nan'))
-
-        # E0_Initial_Guess = case1.One_Strip_Solve_Sonic(esp_0)[1]
-        
-        # axs[i].scatter(esp_0, E0_Initial_Guess, color='r', marker='o', linewidths=3, label='Initial Guess \u03B5_0')
-        axs[i].plot(esp_0_lis, E_0_lis, marker='o',label=f'Mach {M}')
-        axs[i].plot(esp_0_lis, np.zeros(len(esp_0_lis)), 'k')
-        axs[i].set_ylabel('E_0')
-        axs[i].set_ylim([-0.1, 0.25])
-        axs[i].grid()
-        axs[i].legend()
-
-    axs[-1].set_xlabel('\u03B5_0')
+        axs[-1].set_xlabel('$\\varepsilon_{0}$')
+        leg = fig.axes[2].legend(loc='upper center', bbox_to_anchor=(0.5, -.3))
+        tikz.save('tikzs/E0_vs_eps0.tex', axis_height='5cm', axis_width='12cm')
     return fig
 
 
-def One_Strip_Single_Case(Mach, cutoff, plot_compare=True, print_sol=True):
-
-    case = Frozen_Blunt_Flow(M_inf=Mach, gamma=1.4, N=1, cutoff=cutoff, print_sol=print_sol)
+def One_Strip_Single_Case(case, plot_compare=True, print_sol=True):
 
     # Solve stand off distance
     solved_esp_0 = case.One_Strip_Find_epsilon_0()
@@ -1389,60 +1500,146 @@ def One_Strip_Single_Case(Mach, cutoff, plot_compare=True, print_sol=True):
     theta_lis = np.arange(0, 1.250, 0.0625)
 
     # Solved unkown functions as dense output
-    [epsilon, sigma, v0, theta_v0s, theta_w1s, theta_lis]=case.One_Strip_Solve_Full(solved_esp_0, theta_lis)
+    [epsilon, sigma, v0, theta_v0s, theta_w1s, theta_lis]=case.One_Strip_Solve_Full(solved_esp_0, theta_lis, print_sol=print_sol)
 
-    case.plot_contour(epsilon, sigma, v0, theta_lis[theta_lis.index(theta_v0s)], theta_lis[theta_lis.index(theta_w1s)])
+    return epsilon, sigma, v0, theta_v0s, theta_w1s, theta_lis
 
-    resutls_figures = case.plot_properties('epsilon','v0','p0/p0(0)','kai')
 
-    # Add comparation to existing plots
-    if plot_compare == True:
-        case.plot_compare(resutls_figures, Mach=Mach, N=3)
-        if Mach == 3:
-            case.plot_compare(resutls_figures, Mach=Mach, N=1, fig_lable='--^')
+def One_Strip_Save_Tikz(case: Frozen_Blunt_Flow, plot_var):
+    resutls_figures = case.plot_properties(plot_var)
+
+    case.plot_compare(resutls_figures, Mach=case.M_inf, N=3)
+
+    if case.M_inf == 3:
+        case.plot_compare(resutls_figures, Mach=case.M_inf, N=1, fig_lable='--^')
+    
+        if plot_var == 'p0/p0(0)':
+            tikz.save(f'tikzs/Mach{case.M_inf}_cut{case.cutoff}_p0_p0(0).tex', axis_height='9cm', axis_width='11cm')
+        else:
+            tikz.save(f'tikzs/Mach{case.M_inf}_cut{case.cutoff}_{plot_var}.tex', axis_height='9cm', axis_width='11cm')
+
         return resutls_figures
     else:
+        if plot_var == 'p0/p0(0)':
+            tikz.save(f'tikzs/Mach{case.M_inf}_cut{case.cutoff}_p0_p0(0).tex', axis_height='9cm', axis_width='11cm')
+        else:
+            tikz.save(f'tikzs/Mach{case.M_inf}_cut{case.cutoff}_{plot_var}.tex', axis_height='9cm', axis_width='11cm')
         return resutls_figures
 
 
-def Plot_Compare_Cutoff(Mach):
+def Plot_Compare_Cutoff(Machs):
     cutoff = [0.93, 0.94, 0.95]
     theta_lis = np.arange(0, 1.250, 0.0625)
-    
-    vars = ['epsilon', 'v0', 'p0/p0(0)', 'kai']
-    symbols = {'theta':"$\\"+'theta$','kai':"$\\"+'chi$', 'epsilon':"$\\"+'varepsilon$', 'v0': '$v_{0}$'}
+    # Machs = [3,4,5]
+    # Variables to plot 
+    vars = ['v0']
+    symbols = {'theta':"$\\"+'theta$','kai':"$\\"+'chi$', 'epsilon':"$\\"+'varepsilon$', 'v0': '$u_{0}$', 'w1': '$w_{1}$'}
     figure_lis = {}
-    for var in vars:
-        fig, ax = plt.subplots(len([var]))
-        ax.grid(True)
-        ax.set_xlabel(f"{symbols['theta']}")
-        if var in symbols:
-            ax.set_ylabel(symbols[var])
-        else:
-            ax.set_ylabel(var)
-        figure_lis[var] = fig
 
-    condition = []
-    for i, c in enumerate(cutoff):
-        condition.append(Frozen_Blunt_Flow(M_inf=Mach, gamma=1.4, N=1, cutoff=c, print_sol=False))
+    fig, ax = plt.subplots(len(Machs))
+    
 
-        # Solve stand off distance
-        solved_esp_0 = condition[i].One_Strip_Find_epsilon_0()
+    condition = [[],[],[]]
+    for m, mach in enumerate(Machs):
+        for i, c in enumerate(cutoff):
+            condition[m].append(Frozen_Blunt_Flow(M_inf=mach, gamma=1.4, N=1, cutoff=c, print_sol=False))
 
-        # Solved unkown functions as dense output
-        [epsilon, sigma, v0, theta_v0s, theta_w1s, theta_lis]=condition[i].One_Strip_Solve_Full(solved_esp_0, theta_lis)
+            # Solve stand off distance
+            solved_esp_0 = condition[m][i].One_Strip_Find_epsilon_0()
 
-        file = open(condition[i].result_file)
-        resutls = js.load(file)
-        symbols = {'theta':"$\\"+'theta$','kai':"$\\"+'chi$', 'epsilon':"$\\"+'varepsilon$', 'v0': '$v_{0}$'}
+            # Solved full solution to store json file
+            [epsilon, sigma, v0, theta_v0s, theta_w1s, theta_lis]=condition[m][i].One_Strip_Solve_Full(solved_esp_0, theta_lis)
 
-        for v, var in enumerate(vars):
-            # fig, ax = plt.subplots(len([var]))
-            figure_lis[var].axes[0].plot(resutls['theta'], resutls[var], '-o',color='black',linewidth=0.5, label=f'M{int(condition[i].M_inf)} N={condition[i].N} cut:{int(100*condition[i].cutoff)}%',markersize=4)
-            figure_lis[var].axes[0].plot(resutls['sonic']['theta'], resutls['sonic'][var], 'o',color='red',linewidth=0.5, label=f'$v_{0}$ Sonic', markersize=5)
-            
-            figure_lis[var].axes[0].legend()
+            file = open(condition[m][i].result_file)
+            resutls = js.load(file)
+            file.close()
+            symbols = {'theta':"$\\"+'theta$','kai':"$\\"+'chi$', 'epsilon':"$\\"+'varepsilon$', 'v0': '$v_{0}$'}
+            linestyles = ['-','--','-.']
+            markers = ['o', '^', 's']
+
         
-        file.close()
+        # fig, ax = plt.subplots(len([var]))
+        # fig.axes[v].plot(resutls['theta'], resutls[var], labels[i],color='black',linewidth=0.25, label=f'M{int(condition[i].M_inf)} N={condition[i].N} $\kappa$:{int(100*condition[i].cutoff)}%',markersize=4)
+            fig.axes[m].plot(resutls['theta'], resutls['v0'], linestyles[i],color='black',linewidth=0.75, label=f'$\kappa$:{condition[m][i].cutoff}',markersize=3)
+
+            fig.axes[m].plot(resutls['sonic']['theta'], resutls['sonic']['v0'], markers[i], color='red', markersize=3)
+            
+            
+            # leg.set_title(f'Mach{mach}')
+        fig.axes[m].grid(True)
+        fig.axes[m].set_ylabel(symbols['v0'])
+        fig.axes[m].text(0.8,0.45,'$u_{0}*$',color='red',)
+        tm = fig.axes[m].text(0,0.45,f'Mach {mach}',color='black',bbox=dict(facecolor='white', edgecolor='grey'))
+
+    fig.axes[2].set_xlabel(f"{symbols['theta']}")
+    leg = fig.axes[2].legend(loc='upper center', bbox_to_anchor=(0.5, -.3), ncol=3)
+    tikz.save(f'tikzs/Mach_cutoff_compare.tex', axis_height='5cm', axis_width='12cm')
     return
 
+
+def Plot_standoff_compare():
+
+    file = open('data/Kim_1955.json')
+    Kim1955 = js.load(file)
+    file.close()
+
+    Kim_Mach = Kim1955['shock-stand-off']['Kim']['Mach'][1:]
+    Kim_esp0 = Kim1955['shock-stand-off']['Kim']['epsilon'][1:]
+
+    # Program Data
+    present = {
+            'Mach':[1.834421199, 2.770067875, 3.289997211, 3.9821404, 4.205783357, 5.99706927, 2.5, 3, 4, 5],
+
+            'N=1':[1.71409, 0.76924, 0.631, 0.53618, 0.52023, 0.43919, 0.89282, 0.69514, 0.53565, 0.47142] 
+            }
+    
+    OMB = {'Mach':[2.5, 3, 4, 5],
+           'epsilon0': [0.913, 0.703, 0.546, 0.481]}
+    
+    fig, ax = plt.subplots()
+    plt.scatter(present['Mach'], present['N=1'], marker='s', color='black', label='Present N=1',facecolor='None')
+    
+    plt.scatter(Kim_Mach, Kim_esp0, marker='o', color='black',facecolor='None', label='Kim 1955')
+    
+    plt.scatter(OMB['Mach'], OMB['epsilon0'], marker='^', color='black', label='OMB N=3',facecolor='None')
+
+    plt.xlabel('$M_{\infty}$')
+    plt.ylabel('$\\varepsilon_{0}$')
+    plt.grid()
+    plt.legend()
+    tikz.save('tikzs/eps_vs_Mach.tex')
+    return
+
+
+if __name__ == "__main__":
+
+    # Blunt_E0_vs_esp0_test(Mach=[3, 4, 5])
+    # Plot_Compare_Cutoff(Machs=[3,4,5]
+    # Plot_standoff_compare()
+
+    case = Frozen_Blunt_Flow(M_inf=3, gamma=1.4, N=1, cutoff=0.95, print_sol=True)
+
+    [epsilon, sigma, v0, theta_v0s, theta_w1s, theta_lis] = One_Strip_Single_Case(case, plot_compare=False, print_sol=True)
+
+    # case.plot_contour(epsilon, sigma, v0, theta_lis[theta_lis.index(theta_v0s)], theta_lis[theta_lis.index(theta_w1s)])
+
+    vars = ['epsilon','v0','p0/p0(0)','kai','w1']
+    for var in vars:
+        One_Strip_Save_Tikz(case, var)
+
+    plt.show()
+
+
+
+    # Blunt_E0_vs_esp0_test(Mach=[3, 4, 5])
+
+    # import TM_Exact_Solution as TM
+    # Mach = [1.5, 2, 4, 8, 10]
+
+    # for M in Mach:
+        # One-Strip Solution
+    #     MIR_1 = Frozen_Cone_Flow(M, 1.4, 45)
+    #     Cone_Angle_1st = Frozen_Cone_Flow.one_strip_solve(MIR_1, full_output=True)
+
+        # Exact Solution
+        # TM.Taylor_Maccoll_Solve_All(M, 1.4, 45)

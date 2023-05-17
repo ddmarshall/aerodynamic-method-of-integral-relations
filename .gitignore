@@ -3,3 +3,4 @@
 *.pyc
 *.csv
 /results/*.json
+/tikzs/*

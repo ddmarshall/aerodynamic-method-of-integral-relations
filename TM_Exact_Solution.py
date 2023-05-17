@@ -169,7 +169,10 @@ class Taylor_Macoll:
         p_2_p_1 = rho_2_rho_1**gamma
         p_theta = p_del * p_2_p_1
 
-        return [v_r_theta, v_theta_theta, rho_theta, p_theta]
+        # temperature
+        T_theta = gamma*(M_inf**2)*p_theta/rho_theta
+
+        return [v_r_theta, v_theta_theta, rho_theta, p_theta, T_theta]
 
 
     def coord_trans(V_r, V_theta, angle):
@@ -187,48 +190,44 @@ class Taylor_Macoll:
         return [V_x, V_y]
 
 
-    def main():
-        '''
-        ***Keep for code archive***
-        '''
-        Mach = 8
-        gamma = 1.4
-        # Ratio to convert V_1 based to V_m based non-dimensional properties.(V_max/V_1:Nasa 1135 eqn.51)
-        V_m2V_1 = (((gamma-1)/2)*(Mach**2)*((1 + ((gamma-1)/2)*Mach**2)**-1))**(-0.5)
-
-        # Cone angle and stop angle for solver
-        Beta = 38.155
-        stop_theta = 1
-        
-        theta_range = [Beta, stop_theta]
-        Initial_Condition = frozen_IC(Mach, Beta)
-
-        # Get Full Solution with theta range
-        [sol_func, theta_cone] = Taylor_Macoll_Solve(Taylor_Macoll_ODEs_Modified, Initial_Condition, theta_range)
-
-        # Define intermediate strip angle [deg]
-        theta_1 = (Beta+theta_cone)/2
-
-        # Get flow properties at half theta line for 2-strip
-        [v_r_1, v_theta_1, rho_1] = Taylor_Macoll_Post(sol_func, theta_1)
-
-        # Transfer from polar coord to cone x-y coord
-        [u_1, v_1] = coord_trans(v_r_1, v_theta_1, theta_1 - theta_cone)
-
-        # Get flow properties at cone theta for 2-strip
-        [u_0, v_0, rho_0] = Taylor_Macoll_Post(sol_func, theta_cone)
-
-        # Print Information
-        print(f'\nInput Wave Angle: {Beta} [deg]')
-        print(f'Taylor Macoll Solution: {theta_cone} [deg]\n')
-        print(f'Flow Properties at 1/2 theta: {theta_1} in Polar Coord')
-        print(f'v_r_1: {v_r_1} \nv_theta_1: {v_theta_1} \nrho_1: {rho_1}\n')
-
-        print(f'Flow Properties at 1/2 theta: {theta_1} in x-y Coord')
-        print(f'u_1: {u_1} \nv_1: {v_1} \nrho_1: {rho_1}\n')
-
-        print(f'Flow Properties at cone: {theta_cone} in x-y Coord')
-        print(f'u_0  : {u_0} \nv_0  : {v_0} \nrho_0: {rho_0}\n')
+def Taylor_Maccoll_Solve_All(Mach, gamma, Beta):
+    '''
+    ***Keep for code archive***
+    '''
+     
+    case = Taylor_Macoll(Mach, gamma, Beta)
+    # Stop angle for solver
+    stop_theta = 1
     
-        return
+    theta_range = [Beta, stop_theta]
+    Initial_Condition = Taylor_Macoll.frozen_IC(case)
+
+    # Get Full Solution with theta range
+    [sol_func, theta_cone] = Taylor_Macoll.Taylor_Macoll_Solve(case)
+
+    # Define intermediate strip angle [deg]
+    theta_1 = (Beta+theta_cone)/2
+
+    # Get flow properties at half theta line for 2-strip
+    # [v_r_1, v_theta_1, rho_1] = Taylor_Macoll.Taylor_Macoll_Post(sol_func, theta_1)
+
+    # Transfer from polar coord to cone x-y coord
+    # [u_1, v_1] = Taylor_Macoll.coord_trans(v_r_1, v_theta_1, theta_1 - theta_cone)
+
+    # Get flow properties at cone
+    [u_0, v_0, rho_0, p_0, T_0] = Taylor_Macoll.Taylor_Macoll_Post(case, sol_func, theta_cone)
+
+
+    # Print Information
+    print(f'\nInput Wave Angle: {Beta:5.4f} [deg]')
+    print(f'Taylor Macoll Solution: {theta_cone:5.4f} [deg]')
+    # print(f'Flow Properties at 1/2 theta: {theta_1} in Polar Coord')
+    # print(f'v_r_1: {v_r_1} \nv_theta_1: {v_theta_1} \nrho_1: {rho_1}\n')
+
+    # print(f'Flow Properties at 1/2 theta: {theta_1} in x-y Coord')
+    # print(f'u_1: {u_1} \nv_1: {v_1} \nrho_1: {rho_1}\n')
+    print(f'Flow Properties at cone in x-y Coord')
+    print(f'u_0: {u_0:5.4f} \nv_0: {v_0:5.4f} \nrho_0: {rho_0:5.4f}\np_0: {p_0:5.4f}\nT_0: {T_0:5.4f}\nS')
+
+    return
 
