@@ -927,8 +927,8 @@ class Frozen_Blunt_Flow:
         return [desp_dtheta, dsig_dtheta, dv0_dtheta]
 
 
-    def One_Strip_Solve_Sonic(self, epsilon_0, print_sol=True):
-
+    def One_Strip_Solve_Sonic(self, epsilon_0):
+        print_sol=self.print
         # Start Stop Theta [0 -> 1.125] (paper)
         theta_range = [0, 1.125]
 
@@ -996,7 +996,7 @@ class Frozen_Blunt_Flow:
         print(f"Aescending From Initial Epsilon Guess, step: {d_esp}...")
 
         while E0 > 0 or np.isnan(E0):
-            solver_out = self.One_Strip_Solve_Sonic(esp0, print_sol=True)
+            solver_out = self.One_Strip_Solve_Sonic(esp0)
             
             if solver_out == None:
                 esp0 *= 0.99
@@ -1026,7 +1026,7 @@ class Frozen_Blunt_Flow:
         # Now Run Bisect for root
         def E0_func(esp0):
             try:
-                Flow_Solution, E0, theta_sonic = self.One_Strip_Solve_Sonic(esp0, print_sol=True)
+                Flow_Solution, E0, theta_sonic = self.One_Strip_Solve_Sonic(esp0)
             except TypeError:
                 return 0.1
             if theta_sonic.converged == False or np.isnan(E0):
@@ -1045,7 +1045,7 @@ class Frozen_Blunt_Flow:
     def One_Strip_Solve_Full(self, esp_0, theta_lis, print_sol=True):
         
         # Solution Before sonic
-        sol_pre_sonic,_,v0_sonic = self.One_Strip_Solve_Sonic(esp_0, print_sol=False)
+        sol_pre_sonic,_,v0_sonic = self.One_Strip_Solve_Sonic(esp_0)
 
         # Solution from 0 to sonic using dense output
         theta_lis = sorted(np.append(theta_lis, v0_sonic.root))
@@ -1127,6 +1127,25 @@ class Frozen_Blunt_Flow:
     ###         Plot Methods            ###
 
     def plot_properties(self, *vars):
+        """ Pressure immediatly behind shock
+
+        Arguments:
+            \u03C3 {float} -- Inclination of shock wave to the direction of incident stream line [rad]
+
+        Keyword Arguments:
+            -- 'epsilon': Shock standoff distance
+            -- 'v0': Surface velocity
+            -- 'p0/p0(0)': Surface pressure normalized by stagnation pressure
+            -- 'kai': Shock angle to vertical line
+            -- 'sigma': Shock angle to horizontal line
+            -- 'w1': Flow speed on shock
+
+        Raises:
+
+        Returns:
+            
+        """
+        
         
         file = open(self.result_file)
         resutls = js.load(file)
@@ -1277,13 +1296,13 @@ class Frozen_Blunt_Flow:
         
         if f'Mach={self.M_inf}' in Kim_shock["shock-shape"]:
             Mach_ax.plot(Kim_shock["shock-shape"][f'Mach={self.M_inf}']['x'], Kim_shock["shock-shape"][f'Mach={self.M_inf}']['y'], color='black', linestyle=':', linewidth=1, label='Kim Exp. Shock')
-        Mach_ax.clabel(mach_prof, inline=1, fontsize=10, colors='black')
+        Mach_ax.clabel(mach_prof, inline=True, fontsize=10, colors='black')
         Mach_ax.set_xlim(-2,0)
         Mach_ax.set_ylim(0, 2)
         Mach_ax.set_xticks([0, -1, -2])
         Mach_ax.set_yticks([0, 1, 2])
         Mach_ax.legend(loc='upper center', bbox_to_anchor=(0.5, -.1))
-        tikz.save(f'tikzs/Mach{case.M_inf}_Contour_cut{case.cutoff}_Mach.tex', axis_height='11cm', axis_width='11cm')
+        tikz.save(f'tikzs/Mach{self.M_inf}_Contour_cut{self.cutoff}_Mach.tex', axis_height='11cm', axis_width='11cm')
 
         '''
         # Plot and compare at each xi and compare to OMB
@@ -1312,21 +1331,51 @@ class Frozen_Blunt_Flow:
         Mach_ax.set_xticks([0, -1, -2])
         Mach_ax.set_yticks([0, 1, 2])
         p2p0_cbar = p2p0_contour.colorbar(p2p0_prof, fraction=0.05, pad=0.08,location='bottom')
-        p2p0_cbar.ax.set_xlabel('p/p_stag')
-        tikz.save(f'tikzs/Mach{case.M_inf}_Contour_cut{case.cutoff}_Press.tex', axis_height='11cm', axis_width='11cm')
-
+        p2p0_cbar.ax.set_xlabel('$p/p_{0}(0)$')
+        tikz.save(f'tikzs/Mach{self.M_inf}_Contour_cut{self.cutoff}_Press.tex', axis_height='11cm', axis_width='11cm')
+    
         # Streamline polt
         psi_contour, psi_ax = plt.subplots()
         psi_contour.set_size_inches(7.5, 7.5)
-        psi_prof = psi_ax.contour(xx, yy, psi, levels=20, colors='black', linewidths=0.75)
         psi_ax.plot(-np.linspace(0,1,100), np.sqrt(1 - (np.linspace(0,1,100)**2)), linewidth=1, color='black')
+        psi_ax.plot(-np.linspace(0,1,100), -np.sqrt(1 - (np.linspace(0,1,100)**2)), linewidth=1, color='black')
+        psi_prof = psi_ax.contour(xx, yy, psi, levels=20, colors='black', linewidths=0.75)
         psi_ax.plot(-r_coord[-1]*np.cos(theta_coord[-1]), r_coord[-1]*np.sin(theta_coord[-1]), linewidth=1, color='black')
-        psi_ax.fill_between(-np.linspace(0,1,100),np.sqrt(1 - (np.linspace(0,1,100)**2)), hatch="//",linewidth=0.5, alpha=0.0)
+
+        # psi_ax.fill_between(-np.linspace(0,1,100),np.sqrt(1 - (np.linspace(0,1,100)**2)), hatch="//",linewidth=0.5, alpha=0.0)
         psi_ax.set_xlim(-2,0)
         psi_ax.set_ylim(0, 2)
         Mach_ax.set_xticks([0, -1, -2])
         Mach_ax.set_yticks([0, 1, 2])
-        tikz.save(f'tikzs/Mach{case.M_inf}_Streamline_cut{case.cutoff}.tex', axis_height='11cm', axis_width='11cm')
+
+        # Compare to OMB streamlines
+        if f'Mach={self.M_inf}' in OMB_shock:
+            psi_ax.plot(OMB_shock[f'Mach={self.M_inf}']['shock']['x'], -np.array(OMB_shock[f'Mach={self.M_inf}']['shock']['y']), color='black', linestyle='--', linewidth=1)
+
+            # OMB stream functions
+            OMB_stream = []
+            OMB_r_to_plot = []
+            OMB_esp = OMB_shock[f'Mach={self.M_inf}']['epsilon']
+            OMB_theta = OMB_shock[f'Mach={self.M_inf}']['theta']
+            OMB_esp_to_plot = np.interp(OMB_prop[f'Mach={self.M_inf}']
+            ['theta'], OMB_theta, OMB_esp)
+            
+            for x in xi:
+                OMB_stream.append(OMB_prop[f'Mach={self.M_inf}'][f'xi={x}']['psi']) 
+                OMB_r_to_plot.append(list(1 + np.multiply(np.array(x), OMB_esp_to_plot)))
+            OMB_xx = OMB_r_to_plot*np.cos(OMB_prop[f'Mach={self.M_inf}']
+            ['theta'])
+            OMB_yy = OMB_r_to_plot*np.sin(OMB_prop[f'Mach={self.M_inf}']
+            ['theta'])
+            psi_ax.contour(-OMB_xx, -OMB_yy, OMB_stream, levels=20, colors='blue', linewidths=0.75)
+            psi_ax.plot([1],[1], color='blue', label='OMB N=3 Streamlines')
+            psi_ax.plot([1],[1], color='black',label=f'M{int(self.M_inf)} N={self.N} $\kappa$:{self.cutoff}')
+            psi_ax.set_xlim(-3,0)
+            psi_ax.set_ylim(-2, 2)
+            psi_ax.set_aspect(1)
+            psi_ax.legend(loc='upper center', bbox_to_anchor=(0.5, -.1))
+
+        tikz.save(f'tikzs/Mach{self.M_inf}_Streamline_cut{self.cutoff}.tex', axis_height='12cm', axis_width='9cm')
         
         return Mach_contour, p2p0_contour, psi_contour
 
@@ -1491,7 +1540,7 @@ def Blunt_E0_vs_esp0_test(Mach=[]):
     return fig
 
 
-def One_Strip_Single_Case(case, plot_compare=True, print_sol=True):
+def One_Strip_Single_Case(case):
 
     # Solve stand off distance
     solved_esp_0 = case.One_Strip_Find_epsilon_0()
@@ -1500,7 +1549,7 @@ def One_Strip_Single_Case(case, plot_compare=True, print_sol=True):
     theta_lis = np.arange(0, 1.250, 0.0625)
 
     # Solved unkown functions as dense output
-    [epsilon, sigma, v0, theta_v0s, theta_w1s, theta_lis]=case.One_Strip_Solve_Full(solved_esp_0, theta_lis, print_sol=print_sol)
+    [epsilon, sigma, v0, theta_v0s, theta_w1s, theta_lis]=case.One_Strip_Solve_Full(solved_esp_0, theta_lis, print_sol=case.print)
 
     return epsilon, sigma, v0, theta_v0s, theta_w1s, theta_lis
 
@@ -1533,8 +1582,11 @@ def Plot_Compare_Cutoff(Machs):
     # Machs = [3,4,5]
     # Variables to plot 
     vars = ['v0']
-    symbols = {'theta':"$\\"+'theta$','kai':"$\\"+'chi$', 'epsilon':"$\\"+'varepsilon$', 'v0': '$u_{0}$', 'w1': '$w_{1}$'}
     figure_lis = {}
+
+    symbols = {'theta':"$\\"+'theta$','kai':"$\\"+'chi$', 'epsilon':"$\\"+'varepsilon$', 'v0': '$u_{0}$'}
+    linestyles = ['-','--','-.']
+    markers = ['o', '^', 's']
 
     fig, ax = plt.subplots(len(Machs))
     
@@ -1553,9 +1605,7 @@ def Plot_Compare_Cutoff(Machs):
             file = open(condition[m][i].result_file)
             resutls = js.load(file)
             file.close()
-            symbols = {'theta':"$\\"+'theta$','kai':"$\\"+'chi$', 'epsilon':"$\\"+'varepsilon$', 'v0': '$v_{0}$'}
-            linestyles = ['-','--','-.']
-            markers = ['o', '^', 's']
+            
 
         
         # fig, ax = plt.subplots(len([var]))
@@ -1572,7 +1622,7 @@ def Plot_Compare_Cutoff(Machs):
         tm = fig.axes[m].text(0,0.45,f'Mach {mach}',color='black',bbox=dict(facecolor='white', edgecolor='grey'))
 
     fig.axes[2].set_xlabel(f"{symbols['theta']}")
-    leg = fig.axes[2].legend(loc='upper center', bbox_to_anchor=(0.5, -.3), ncol=3)
+    leg = fig.axes[1].legend(loc='center left', bbox_to_anchor=(1.01, 0.5), ncol=1)
     tikz.save(f'tikzs/Mach_cutoff_compare.tex', axis_height='5cm', axis_width='12cm')
     return
 
@@ -1609,37 +1659,3 @@ def Plot_standoff_compare():
     plt.legend()
     tikz.save('tikzs/eps_vs_Mach.tex')
     return
-
-
-if __name__ == "__main__":
-
-    # Blunt_E0_vs_esp0_test(Mach=[3, 4, 5])
-    # Plot_Compare_Cutoff(Machs=[3,4,5]
-    # Plot_standoff_compare()
-
-    case = Frozen_Blunt_Flow(M_inf=3, gamma=1.4, N=1, cutoff=0.95, print_sol=True)
-
-    [epsilon, sigma, v0, theta_v0s, theta_w1s, theta_lis] = One_Strip_Single_Case(case, plot_compare=False, print_sol=True)
-
-    # case.plot_contour(epsilon, sigma, v0, theta_lis[theta_lis.index(theta_v0s)], theta_lis[theta_lis.index(theta_w1s)])
-
-    vars = ['epsilon','v0','p0/p0(0)','kai','w1']
-    for var in vars:
-        One_Strip_Save_Tikz(case, var)
-
-    plt.show()
-
-
-
-    # Blunt_E0_vs_esp0_test(Mach=[3, 4, 5])
-
-    # import TM_Exact_Solution as TM
-    # Mach = [1.5, 2, 4, 8, 10]
-
-    # for M in Mach:
-        # One-Strip Solution
-    #     MIR_1 = Frozen_Cone_Flow(M, 1.4, 45)
-    #     Cone_Angle_1st = Frozen_Cone_Flow.one_strip_solve(MIR_1, full_output=True)
-
-        # Exact Solution
-        # TM.Taylor_Maccoll_Solve_All(M, 1.4, 45)

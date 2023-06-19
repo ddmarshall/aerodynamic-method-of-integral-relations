@@ -17,7 +17,11 @@ for M_inf in Mach_Range:
     print(f'Beta\tExact\t1-Strip\t')#\t2-Strip Solution Msg:')
     
     # Start with minimum wave angle with round up avoiding division by 0
-    Beta_swpt = np.arange(np.ceil(np.rad2deg(np.arcsin(1/M_inf))), 80)
+    Beta_swpt1 = np.linspace(np.rad2deg(np.arcsin(1/M_inf)+0.001), np.rad2deg(np.arcsin(1/M_inf)+np.deg2rad(5)), 20)
+
+    Beta_swpt = np.append(Beta_swpt1, np.linspace(np.rad2deg(np.arcsin(1/M_inf)+np.deg2rad(6)), 80, 50))
+    # Beta_swpt = np.linspace(np.rad2deg(np.arcsin(1/M_inf)+0.001), 80)
+
 
     # List for Plot
     Cone_Angle_Exact_ls = [0]
@@ -41,7 +45,7 @@ for M_inf in Mach_Range:
 
         if Cone_Angle_Exact > Cone_Angle_Exact_ls[-1]:
 
-            print(f'{Beta:2.0f}\t{Cone_Angle_Exact:6.4f}\t{Cone_Angle_1st:6.4f}')
+            print(f'{Beta:4.2f}\t{Cone_Angle_Exact:6.4f}\t{Cone_Angle_1st:6.4f}')
                 #   \t\t{Cone_Angle_2nd:7.4f}\t\t{solver_msg}')
         
             Beta_ls.append(Beta)
@@ -55,10 +59,10 @@ for M_inf in Mach_Range:
         else:
             break
 
-    plt.plot(Cone_Angle_Exact_ls, Beta_ls, color='black',linestyle='dashed', linewidth='.5', label=my_labels["x1"])
+    plt.plot(Cone_Angle_Exact_ls[0:], Beta_ls[0:], color='black',linestyle='dashed', linewidth='.5', label=my_labels["x1"])
     my_labels['x1'] = "_nolegend_"
 
-    plt.plot(Cone_Angle_1strip_ls, Beta_ls, color='black', linewidth='.5', label=my_labels["x2"])
+    plt.plot(Cone_Angle_1strip_ls[0:], Beta_ls[0:], color='black', linewidth='.5', label=my_labels["x2"])
     my_labels['x2'] = "_nolegend_"
 
     # plt.plot(Cone_Angle_2strip_ls, Beta_2strip_ls, color='red',linestyle='dashed', linewidth='1.5', label=my_labels["x3"])
@@ -71,4 +75,5 @@ plt.ylabel('$\\beta$ [deg]')
 plt.grid()
 plt.legend()
 
-tikz.save('tikzs/beta_mach_theta_diag.tikz', axis_height='9cm', axis_width='14cm')
+tikz.save('tikzs/beta_mach_theta_diag.tex', axis_height='9cm', axis_width='14cm')
+plt.show()
