@@ -1,0 +1,6 @@
+
+*.pyc
+*.pyc
+*.csv
+/results/*.json
+/tikzs/*
